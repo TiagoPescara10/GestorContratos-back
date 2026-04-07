@@ -162,7 +162,7 @@ class AplicarAumentoTest(TestCase):
     def setUp(self):
         hoy = date.today()
         self.contrato = crear_contrato(
-            fechaInicio=hoy.replace(day=1),
+            fechaInicio=hoy.replace(day=1) - timedelta(days=30),
             fechaFin=hoy.replace(day=1) + timedelta(days=365),
             valorMensual=Decimal('100000.00'),
         )
@@ -182,8 +182,38 @@ class AplicarAumentoTest(TestCase):
         services.aplicar_aumento(self.contrato, 'porcentaje_fijo', Decimal('10'))
         services.aplicar_aumento(self.contrato, 'porcentaje_fijo', Decimal('10'))
         em = self.contrato.meses.last()
-        # 100000 × 1.1 × 1.1 = 121000
+        # El segundo aumento se aplica sobre el monto ya ajustado.
         self.assertEqual(em.montoFinal, Decimal('121000.00'))
+
+    def test_aplica_segundo_aumento_en_meses_posteriores(self):
+        hoy = date.today()
+        mes_actual = self.contrato.meses.get(anio=hoy.year, mes=hoy.month - 1)
+        siguiente_mes = mes_actual.mes + 1
+        siguiente_anio = mes_actual.anio
+        if siguiente_mes > 11:
+            siguiente_mes = 0
+            siguiente_anio += 1
+
+        services.aplicar_aumento(
+            self.contrato,
+            tipo_aumento='porcentaje_fijo',
+            porcentaje=Decimal('10'),
+            mes_desde=mes_actual.mes + 1,
+            anio_desde=mes_actual.anio,
+        )
+        services.aplicar_aumento(
+            self.contrato,
+            tipo_aumento='porcentaje_fijo',
+            porcentaje=Decimal('10'),
+            mes_desde=siguiente_mes + 1,
+            anio_desde=siguiente_anio,
+        )
+
+        affected = self.contrato.meses.filter(
+            anio=siguiente_anio,
+            mes=siguiente_mes,
+        ).first()
+        self.assertEqual(affected.montoFinal, Decimal('121000.00'))
 
     def test_no_aplica_a_meses_pagados(self):
         em = self.contrato.meses.first()
@@ -202,11 +232,22 @@ class AplicarAumentoTest(TestCase):
         em_pasado.refresh_from_db()
         self.assertEqual(em_pasado.montoFinal, monto_original)
 
+    def test_aplica_aumento_a_mes_actual(self):
+        hoy = date.today()
+        em_actual = self.contrato.meses.get(anio=hoy.year, mes=hoy.month - 1)
+        monto_original_actual = em_actual.montoFinal
+
+        services.aplicar_aumento(self.contrato, 'porcentaje_fijo', Decimal('10'))
+
+        em_actual.refresh_from_db()
+        self.assertEqual(em_actual.montoFinal, Decimal('110000.00'))
+        self.assertNotEqual(em_actual.montoFinal, monto_original_actual)
+
     def test_crea_registro_aumento_mensual(self):
         services.aplicar_aumento(self.contrato, 'porcentaje_fijo', Decimal('5'))
         self.assertEqual(AumentoMensual.objects.filter(
             estadoMensual__contrato=self.contrato
-        ).count(), 12)
+        ).count(), 13)
 
 
 class AplicarMoraTest(TestCase):
@@ -355,8 +396,8 @@ class ContratoAPITest(APITestCase):
 
     def test_confirmar_aumento_porcentaje_fijo(self):
         c = crear_contrato(
-            fechaInicio=date(2024, 1, 1),
-            fechaFin=date(2024, 3, 31),
+            fechaInicio=date(2026, 5, 1),
+            fechaFin=date(2026, 7, 31),
         )
         services.generar_meses(c)
         url  = reverse('contrato-confirmar-aumento', args=[c.pk])

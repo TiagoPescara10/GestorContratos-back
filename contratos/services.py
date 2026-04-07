@@ -71,44 +71,63 @@ def aplicar_aumento(
     razon: str = '',
     aplicado_por: str = '',
 ) -> list:
-    """
-    Aplica aumento acumulativo a todos los meses pendientes/parciales FUTUROS.
-    Si mes_desde/anio_desde se proveen, solo aplica desde ese mes en adelante.
-    """
     from datetime import date
+    from django.db.models import Q
+
     hoy = date.today()
 
-    qs = contrato.meses.exclude(estado=EstadoPago.PAGADO).filter(
-        # Solo meses con fecha_vencimiento futura
-        anio__gt=hoy.year
-    ) | contrato.meses.exclude(estado=EstadoPago.PAGADO).filter(
-        anio=hoy.year,
-        mes__gte=hoy.month,
-    ).order_by('anio', 'mes')
+    # Construir filtro de meses futuros o actuales no pagados.
+    # Nota: el campo mes se guarda 0-indexed, mientras que date.today().month es 1-indexed.
+    filtro_futuro = Q(anio__gt=hoy.year) | Q(anio=hoy.year, mes__gte=hoy.month - 1)
 
+    # Si se especifica mes de inicio, filtrar desde ese mes en adelante
     if mes_desde and anio_desde:
         mes_idx = mes_desde - 1  # convertir a 0-indexed
-        qs = qs.filter(
-            anio__gt=anio_desde
-        ) | contrato.meses.filter(
-            anio=anio_desde,
-            mes__gte=mes_idx,
-        ).exclude(estado=EstadoPago.PAGADO).order_by('anio', 'mes')
+        filtro_desde = Q(anio__gt=anio_desde) | Q(anio=anio_desde, mes__gte=mes_idx)
+        qs = contrato.meses.exclude(estado=EstadoPago.PAGADO).filter(
+            filtro_futuro & filtro_desde
+        ).order_by('anio', 'mes')
+    else:
+        qs = contrato.meses.exclude(estado=EstadoPago.PAGADO).filter(
+            filtro_futuro
+        ).order_by('anio', 'mes')
 
     resultados = []
     for em in qs:
+        # Permitir aumentos acumulativos en meses futuros.
+        # Solo evitamos duplicar el mismo registro exacto de aumento.
         monto_anterior = em.montoFinal
+        monto_nuevo = None
 
         if tipo_aumento == 'monto_fijo':
             if monto_fijo is None:
                 raise ValueError('monto_fijo requerido para tipo de aumento monto_fijo')
-            monto_nuevo = (monto_anterior + monto_fijo).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            porcentaje_aplicado = (monto_fijo / monto_anterior * Decimal('100')).quantize(Decimal('0.0001'), rounding=ROUND_HALF_UP) if monto_anterior != 0 else Decimal('0')
+            monto_nuevo = (monto_anterior + monto_fijo).quantize(
+                Decimal('0.01'), rounding=ROUND_HALF_UP
+            )
+            porcentaje_aplicado = (
+                (monto_fijo / monto_anterior * Decimal('100')).quantize(
+                    Decimal('0.0001'), rounding=ROUND_HALF_UP
+                ) if monto_anterior != 0 else Decimal('0')
+            )
         else:
             if porcentaje is None:
                 raise ValueError('porcentaje requerido para tipo de aumento distinto de monto_fijo')
             monto_nuevo = calcular_nuevo_monto(monto_anterior, porcentaje)
             porcentaje_aplicado = porcentaje
+
+        if AumentoMensual.objects.filter(
+            estadoMensual=em,
+            tipoAumento=tipo_aumento,
+            porcentajeAumento=porcentaje_aplicado,
+            indiceAnterior=indice_anterior,
+            indiceNuevo=indice_nuevo,
+            montoAnterior=monto_anterior,
+            montoNuevo=monto_nuevo,
+            razon=razon or f'Aumento {tipo_aumento} {porcentaje_aplicado}%',
+            aplicadoPor=aplicado_por,
+        ).exists():
+            continue
 
         AumentoMensual.objects.create(
             estadoMensual     = em,
@@ -126,16 +145,16 @@ def aplicar_aumento(
         em.save(update_fields=['montoFinal', 'updatedAt'])
 
         resultados.append({
-            'mes':               em.mes,
-            'anio':              em.anio,
-            'montoAnterior':     str(monto_anterior),
-            'montoNuevo':        str(monto_nuevo),
-            'porcentajeAplicado': str(porcentaje),
+            'mes':                em.mes,
+            'anio':               em.anio,
+            'montoAnterior':      str(monto_anterior),
+            'montoNuevo':         str(monto_nuevo),
+            'porcentajeAplicado': str(porcentaje_aplicado),
         })
 
     logger.info(
-        'Contrato %s: aumento %s %.4f%% aplicado a %d meses',
-        contrato.pk, tipo_aumento, porcentaje, len(resultados)
+        'Contrato %s: aumento %s aplicado a %d meses',
+        contrato.pk, tipo_aumento, len(resultados)
     )
     return resultados
 
