@@ -160,9 +160,10 @@ class GenerarMesesTest(TestCase):
 class AplicarAumentoTest(TestCase):
 
     def setUp(self):
+        hoy = date.today()
         self.contrato = crear_contrato(
-            fechaInicio=date(2024, 1, 1),
-            fechaFin=date(2024, 6, 30),
+            fechaInicio=hoy.replace(day=1),
+            fechaFin=hoy.replace(day=1) + timedelta(days=365),
             valorMensual=Decimal('100000.00'),
         )
         services.generar_meses(self.contrato)
@@ -173,13 +174,14 @@ class AplicarAumentoTest(TestCase):
             tipo_aumento='porcentaje_fijo',
             porcentaje=Decimal('10'),
         )
-        em = self.contrato.meses.first()
+        # Verificar que se aplicó a meses futuros (último mes)
+        em = self.contrato.meses.last()
         self.assertEqual(em.montoFinal, Decimal('110000.00'))
 
     def test_aumento_es_acumulativo(self):
         services.aplicar_aumento(self.contrato, 'porcentaje_fijo', Decimal('10'))
         services.aplicar_aumento(self.contrato, 'porcentaje_fijo', Decimal('10'))
-        em = self.contrato.meses.first()
+        em = self.contrato.meses.last()
         # 100000 × 1.1 × 1.1 = 121000
         self.assertEqual(em.montoFinal, Decimal('121000.00'))
 
@@ -192,11 +194,19 @@ class AplicarAumentoTest(TestCase):
         em.refresh_from_db()
         self.assertEqual(em.montoFinal, Decimal('100000.00'))
 
+    def test_no_aplica_a_meses_pasados_pendientes(self):
+        # El primer mes es pasado, debería no aplicarse
+        em_pasado = self.contrato.meses.first()
+        monto_original = em_pasado.montoFinal
+        services.aplicar_aumento(self.contrato, 'porcentaje_fijo', Decimal('10'))
+        em_pasado.refresh_from_db()
+        self.assertEqual(em_pasado.montoFinal, monto_original)
+
     def test_crea_registro_aumento_mensual(self):
         services.aplicar_aumento(self.contrato, 'porcentaje_fijo', Decimal('5'))
         self.assertEqual(AumentoMensual.objects.filter(
             estadoMensual__contrato=self.contrato
-        ).count(), 6)
+        ).count(), 12)
 
 
 class AplicarMoraTest(TestCase):
@@ -244,6 +254,7 @@ class ContratoAPITest(APITestCase):
             'fechaInicio': str(hoy.replace(day=1)),
             'fechaFin': str((hoy.replace(day=1) + timedelta(days=365))),
             'diaPago': 15,
+            'valorConceptosExtras': '1500.00',
         }
         data.update(kwargs)
         return data
@@ -253,6 +264,13 @@ class ContratoAPITest(APITestCase):
         resp = self.client.post(url, self._payload_base(), format='json')
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Contrato.objects.count(), 1)
+
+    def test_guardar_valor_conceptos_extras(self):
+        url  = reverse('contrato-list')
+        resp = self.client.post(url, self._payload_base(), format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        contrato = Contrato.objects.first()
+        self.assertEqual(contrato.valorConceptosExtras, Decimal('1500.00'))
 
     def test_crear_genera_meses_automaticamente(self):
         url = reverse('contrato-list')

@@ -72,10 +72,19 @@ def aplicar_aumento(
     aplicado_por: str = '',
 ) -> list:
     """
-    Aplica aumento acumulativo a todos los meses pendientes/parciales.
+    Aplica aumento acumulativo a todos los meses pendientes/parciales FUTUROS.
     Si mes_desde/anio_desde se proveen, solo aplica desde ese mes en adelante.
     """
-    qs = contrato.meses.exclude(estado=EstadoPago.PAGADO).order_by('anio', 'mes')
+    from datetime import date
+    hoy = date.today()
+
+    qs = contrato.meses.exclude(estado=EstadoPago.PAGADO).filter(
+        # Solo meses con fecha_vencimiento futura
+        anio__gt=hoy.year
+    ) | contrato.meses.exclude(estado=EstadoPago.PAGADO).filter(
+        anio=hoy.year,
+        mes__gte=hoy.month,
+    ).order_by('anio', 'mes')
 
     if mes_desde and anio_desde:
         mes_idx = mes_desde - 1  # convertir a 0-indexed

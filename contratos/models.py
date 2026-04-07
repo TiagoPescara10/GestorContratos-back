@@ -80,12 +80,13 @@ class Contrato(models.Model):
     duracion    = models.IntegerField(editable=False, default=0)
 
     # Ajustes
-    frecuenciaAumento = models.CharField(max_length=20, blank=True, null=True)
-    tipoAumento       = models.CharField(max_length=20, choices=TipoAumentoChoice.choices, blank=True, null=True)
+    frecuenciaAumento     = models.CharField(max_length=20, blank=True, null=True)
+    tipoAumento           = models.CharField(max_length=20, choices=TipoAumentoChoice.choices, blank=True, null=True)
 
     # Extras y adjunto
-    conceptosExtras = models.JSONField(default=list, blank=True)
-    contratoPdf     = models.FileField(upload_to='contratos/pdf/', null=True, blank=True)
+    conceptosExtras       = models.JSONField(default=list, blank=True)
+    valorConceptosExtras  = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    contratoPdf           = models.FileField(upload_to='contratos/pdf/', null=True, blank=True)
 
     # Soft delete
     eliminado   = models.BooleanField(default=False)
