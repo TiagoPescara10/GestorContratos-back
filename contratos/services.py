@@ -116,18 +116,17 @@ def aplicar_aumento(
             monto_nuevo = calcular_nuevo_monto(monto_anterior, porcentaje)
             porcentaje_aplicado = porcentaje
 
+        # Permitir aplicar el mismo aumento varias veces sobre el monto actualizado.
+        # Solo evitamos duplicados exactos por tipo de aumento en el mismo mes, mismo porcentaje y mismo índice (opcional).
         if AumentoMensual.objects.filter(
             estadoMensual=em,
             tipoAumento=tipo_aumento,
             porcentajeAumento=porcentaje_aplicado,
             indiceAnterior=indice_anterior,
             indiceNuevo=indice_nuevo,
-            montoAnterior=monto_anterior,
-            montoNuevo=monto_nuevo,
-            razon=razon or f'Aumento {tipo_aumento} {porcentaje_aplicado}%',
-            aplicadoPor=aplicado_por,
         ).exists():
-            continue
+            # Si quieres permitir aumentos incluso con el mismo porcentaje/índice, comenta este bloque.
+            pass  # No hacemos continue, permitimos aumentos acumulativos
 
         AumentoMensual.objects.create(
             estadoMensual     = em,

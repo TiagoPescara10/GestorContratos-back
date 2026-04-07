@@ -56,11 +56,13 @@ class ContratoDetailSerializer(serializers.ModelSerializer):
     estado         = serializers.ReadOnlyField()
     dias_restantes = serializers.ReadOnlyField()
     meses          = EstadoMensualSerializer(many=True, read_only=True)
+    valorConceptosExtras = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
 
     class Meta:
         model = Contrato
         exclude = ('eliminado', 'eliminadoEn')
         read_only_fields = ('duracion', 'createdAt', 'updatedAt')
+        # valorConceptosExtras se incluye automáticamente por el campo declarado arriba
 
     def validate(self, data):
         fecha_inicio = data.get('fechaInicio', getattr(self.instance, 'fechaInicio', None))
