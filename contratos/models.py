@@ -83,6 +83,10 @@ class Contrato(models.Model):
     frecuenciaAumento     = models.CharField(max_length=20, blank=True, null=True)
     tipoAumento           = models.CharField(max_length=20, choices=TipoAumentoChoice.choices, blank=True, null=True)
 
+    # Ajustes / configuración del contrato
+    incluye_iva = models.BooleanField(default=False)
+    porcentaje_iva = models.DecimalField(max_digits=5, decimal_places=2, default=21)
+
     # Extras y adjunto
     conceptosExtras       = models.JSONField(default=list, blank=True)
     valorConceptosExtras  = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
