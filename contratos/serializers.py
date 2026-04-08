@@ -40,6 +40,7 @@ class EstadoMensualUpdateSerializer(serializers.Serializer):
 class ContratoListSerializer(serializers.ModelSerializer):
     estado         = serializers.ReadOnlyField()
     dias_restantes = serializers.ReadOnlyField()
+    frecuenciaAumento = serializers.CharField(read_only=True)
 
     class Meta:
         model = Contrato
@@ -48,7 +49,7 @@ class ContratoListSerializer(serializers.ModelSerializer):
             'propietarioNombre', 'localidad', 'provincia',
             'tipoPropiedad', 'valorMensual', 'monedaMensual',
             'fechaInicio', 'fechaFin', 'diaPago', 'duracion',
-            'estado', 'dias_restantes', 'createdAt',
+            'estado', 'dias_restantes', 'frecuenciaAumento', 'createdAt',
         ]
 
 
@@ -57,6 +58,7 @@ class ContratoDetailSerializer(serializers.ModelSerializer):
     dias_restantes = serializers.ReadOnlyField()
     meses          = EstadoMensualSerializer(many=True, read_only=True)
     valorConceptosExtras = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    frecuenciaAumento = serializers.CharField(read_only=True)
 
     class Meta:
         model = Contrato

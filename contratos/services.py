@@ -28,11 +28,12 @@ def generar_meses(contrato: Contrato, sobreescribir: bool = False) -> list:
         contrato.meses.all().delete()
 
     creados = []
+    # El primer mes debe ser el de la fecha de inicio, aunque el día sea el último del mes
     cursor = date(contrato.fechaInicio.year, contrato.fechaInicio.month, 1)
     fin    = date(contrato.fechaFin.year,    contrato.fechaFin.month,    1)
 
+    # Si la fecha de inicio es, por ejemplo, 31/12/2025, esto asegura que diciembre 2025 se incluya
     while cursor <= fin:
-        # mes 0-indexed (igual que JS Date.getMonth())
         mes_idx = cursor.month - 1
         obj, created = EstadoMensual.objects.get_or_create(
             contrato = contrato,

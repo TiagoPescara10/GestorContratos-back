@@ -437,3 +437,15 @@ class ContratoAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data['nuevoMonto'], '101000.00')
 
+    def test_mes_inicio_coincide_con_fecha_inicio(self):
+        """El primer EstadoMensual debe coincidir con el mes y año de fechaInicio, sin importar el día."""
+        c = crear_contrato(
+            fechaInicio=date(2025, 12, 31),
+            fechaFin=date(2026, 3, 31),
+        )
+        services.generar_meses(c, sobreescribir=True)
+        primer_mes = c.meses.order_by('anio', 'mes').first()
+        self.assertIsNotNone(primer_mes)
+        self.assertEqual(primer_mes.mes, 11)  # diciembre = 11
+        self.assertEqual(primer_mes.anio, 2025)
+
