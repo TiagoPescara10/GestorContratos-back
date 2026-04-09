@@ -66,6 +66,8 @@ CAMPO_MAP = {
     'garanteNombre':             'garanteNombre',
     'garanteDni':                'garanteDni',
     'garanteTelefono':           'garanteTelefono',
+    'garanteDocumentoTipo':      'garanteDocumentoTipo',
+    'garanteDocumentoArchivo':   'garanteDocumentoArchivo',
     # Financiero
     'valorMensual':              'valorMensual',
     'monedaMensual':             'monedaMensual',

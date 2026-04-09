@@ -272,6 +272,41 @@ class AplicarMoraTest(TestCase):
         resultados = services.aplicar_mora(self.contrato)
         self.assertGreater(len(resultados), 0)
 
+    def test_aplica_mora_a_mes_especifico_y_persiste_campos(self):
+        hoy = date.today()
+        resultados = services.aplicar_mora(
+            self.contrato,
+            mes=hoy.month,
+            anio=hoy.year,
+            dias_atraso=3,
+            recargo_mora=Decimal('11643.17'),
+        )
+        self.assertEqual(len(resultados), 1)
+
+        estado_mensual = self.contrato.meses.get(mes=hoy.month - 1, anio=hoy.year)
+        self.assertTrue(estado_mensual.mora_aplicada)
+        self.assertEqual(estado_mensual.dias_atraso, 3)
+        self.assertEqual(estado_mensual.recargo_mora, Decimal('11643.17'))
+
+    def test_no_permite_doble_aplicacion_de_mora_en_mismo_mes(self):
+        hoy = date.today()
+        services.aplicar_mora(
+            self.contrato,
+            mes=hoy.month,
+            anio=hoy.year,
+            dias_atraso=3,
+            recargo_mora=Decimal('11643.17'),
+        )
+
+        with self.assertRaisesMessage(ValueError, 'La mora ya fue aplicada para este mes.'):
+            services.aplicar_mora(
+                self.contrato,
+                mes=hoy.month,
+                anio=hoy.year,
+                dias_atraso=4,
+                recargo_mora=Decimal('12000.00'),
+            )
+
 
 # ── Tests de API (endpoints) ──────────────────────────────────────────────────
 
@@ -318,6 +353,21 @@ class ContratoAPITest(APITestCase):
         self.client.post(url, self._payload_base(), format='json')
         c = Contrato.objects.first()
         self.assertGreater(c.meses.count(), 0)
+
+    def test_crear_contrato_guarda_metadata_documento_garante(self):
+        url = reverse('contrato-list')
+        resp = self.client.post(url, self._payload_base(
+            garanteNombre='Laura Gómez',
+            garanteDni='22333444',
+            garanteTelefono='3515554444',
+            garanteDocumentoTipo='dni_frente',
+            garanteDocumentoArchivo='garante-dni-frente.pdf',
+        ), format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+        contrato = Contrato.objects.get(pk=resp.data['id'])
+        self.assertEqual(contrato.garanteDocumentoTipo, 'dni_frente')
+        self.assertEqual(contrato.garanteDocumentoArchivo, 'garante-dni-frente.pdf')
 
     def test_listar_contratos(self):
         crear_contrato()
@@ -448,4 +498,69 @@ class ContratoAPITest(APITestCase):
         self.assertIsNotNone(primer_mes)
         self.assertEqual(primer_mes.mes, 11)  # diciembre = 11
         self.assertEqual(primer_mes.anio, 2025)
+
+    def test_get_meses_devuelve_campos_de_mora(self):
+        c = crear_contrato(
+            fechaInicio=date.today().replace(day=1),
+            fechaFin=date.today().replace(day=1) + timedelta(days=365),
+            valorInteresMora=Decimal('5'),
+        )
+        services.generar_meses(c)
+        em = c.meses.order_by('anio', 'mes').first()
+        em.mora_aplicada = True
+        em.dias_atraso = 3
+        em.recargo_mora = Decimal('11643.17')
+        em.save(update_fields=['mora_aplicada', 'dias_atraso', 'recargo_mora', 'updatedAt'])
+
+        url = reverse('contrato-meses', args=[c.pk])
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertIn('mora_aplicada', resp.data[0])
+        self.assertIn('dias_atraso', resp.data[0])
+        self.assertIn('recargo_mora', resp.data[0])
+
+    def test_aplicar_mora_endpoint_a_mes_especifico(self):
+        hoy = date.today()
+        c = crear_contrato(
+            fechaInicio=hoy.replace(day=1) - timedelta(days=60),
+            fechaFin=hoy.replace(day=1) + timedelta(days=365),
+            valorInteresMora=Decimal('5'),
+        )
+        services.generar_meses(c)
+
+        url = reverse('contrato-aplicar-mora', args=[c.pk])
+        resp = self.client.post(url, {
+            'mes': hoy.month,
+            'anio': hoy.year,
+            'diasAtraso': 3,
+            'recargoMora': '11643.17',
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        em = c.meses.get(mes=hoy.month - 1, anio=hoy.year)
+        self.assertTrue(em.mora_aplicada)
+        self.assertEqual(em.dias_atraso, 3)
+        self.assertEqual(em.recargo_mora, Decimal('11643.17'))
+
+    def test_aplicar_mora_endpoint_rechaza_duplicado(self):
+        hoy = date.today()
+        c = crear_contrato(
+            fechaInicio=hoy.replace(day=1) - timedelta(days=60),
+            fechaFin=hoy.replace(day=1) + timedelta(days=365),
+            valorInteresMora=Decimal('5'),
+        )
+        services.generar_meses(c)
+
+        url = reverse('contrato-aplicar-mora', args=[c.pk])
+        payload = {
+            'mes': hoy.month,
+            'anio': hoy.year,
+            'dias_atraso': 3,
+            'recargo_mora': '11643.17',
+        }
+        primera = self.client.post(url, payload, format='json')
+        segunda = self.client.post(url, payload, format='json')
+
+        self.assertEqual(primera.status_code, status.HTTP_200_OK)
+        self.assertEqual(segunda.status_code, status.HTTP_409_CONFLICT)
 

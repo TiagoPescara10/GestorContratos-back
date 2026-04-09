@@ -74,6 +74,8 @@ class Contrato(models.Model):
     garanteNombre   = models.CharField(max_length=150, blank=True, null=True)
     garanteDni      = models.CharField(max_length=20,  blank=True, null=True)
     garanteTelefono = models.CharField(max_length=20,  blank=True, null=True)
+    garanteDocumentoTipo = models.CharField(max_length=50, blank=True, null=True)
+    garanteDocumentoArchivo = models.CharField(max_length=255, blank=True, null=True)
 
     # Términos financieros
     valorMensual     = models.DecimalField(max_digits=12, decimal_places=2)
@@ -153,6 +155,10 @@ class EstadoMensual(models.Model):
     cargosAdicionales = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     tieneRecargo     = models.BooleanField(default=False)
     aumento_aplicado = models.BooleanField(default=False)
+    mora_aplicada    = models.BooleanField(default=False)
+    dias_atraso      = models.IntegerField(default=0)
+    recargo_mora     = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    fecha_aplicacion_mora = models.DateTimeField(null=True, blank=True)
 
 
     createdAt        = models.DateTimeField(auto_now_add=True)

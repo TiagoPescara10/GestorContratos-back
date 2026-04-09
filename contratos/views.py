@@ -197,6 +197,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
         contrato   = self.get_object()
         serializer = AplicarMoraSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
         if not contrato.valorInteresMora:
             return Response(
@@ -204,10 +205,23 @@ class ContratoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        resultados = services.aplicar_mora(
-            contrato     = contrato,
-            aplicado_por = serializer.validated_data.get('aplicadoPor', ''),
-        )
+        try:
+            resultados = services.aplicar_mora(
+                contrato     = contrato,
+                aplicado_por = data.get('aplicadoPor', ''),
+                mes          = data.get('mes'),
+                anio         = data.get('anio'),
+                dias_atraso  = data.get('diasAtraso'),
+                recargo_mora = data.get('recargoMora'),
+            )
+        except EstadoMensual.DoesNotExist:
+            return Response(
+                {'error': 'No existe el mes indicado para este contrato.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_409_CONFLICT)
+
         return Response({
             'message':    f'Mora aplicada a {len(resultados)} meses.',
             'resultados': resultados,

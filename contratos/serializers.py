@@ -40,7 +40,7 @@ class EstadoMensualUpdateSerializer(serializers.Serializer):
 class ContratoListSerializer(serializers.ModelSerializer):
     estado         = serializers.ReadOnlyField()
     dias_restantes = serializers.ReadOnlyField()
-    frecuenciaAumento = serializers.CharField()
+    frecuenciaAumento = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Contrato
@@ -58,7 +58,7 @@ class ContratoDetailSerializer(serializers.ModelSerializer):
     dias_restantes = serializers.ReadOnlyField()
     meses          = EstadoMensualSerializer(many=True, read_only=True)
     valorConceptosExtras = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
-    frecuenciaAumento = serializers.CharField()
+    frecuenciaAumento = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     aumentos_aplicados = serializers.ReadOnlyField()
     class Meta:
@@ -147,4 +147,32 @@ class ConfirmarAumentoSerializer(serializers.Serializer):
 
 
 class AplicarMoraSerializer(serializers.Serializer):
+    mes = serializers.IntegerField(min_value=1, max_value=12, required=False)
+    anio = serializers.IntegerField(required=False)
+    diasAtraso = serializers.IntegerField(min_value=0, required=False)
+    recargoMora = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     aplicadoPor = serializers.CharField(max_length=100, required=False, allow_blank=True)
+
+    def to_internal_value(self, data):
+        if hasattr(data, 'copy'):
+            data = data.copy()
+        else:
+            data = dict(data)
+
+        if 'dias_atraso' in data and 'diasAtraso' not in data:
+            data['diasAtraso'] = data['dias_atraso']
+        if 'recargo_mora' in data and 'recargoMora' not in data:
+            data['recargoMora'] = data['recargo_mora']
+
+        return super().to_internal_value(data)
+
+    def validate(self, data):
+        campos_mes = ('mes', 'anio', 'diasAtraso', 'recargoMora')
+        presentes = [campo for campo in campos_mes if campo in data]
+
+        if presentes and len(presentes) != len(campos_mes):
+            raise serializers.ValidationError(
+                'Para aplicar mora a un mes específico se requieren mes, anio, diasAtraso y recargoMora.'
+            )
+
+        return data

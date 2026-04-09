@@ -8,6 +8,7 @@ Lógica de negocio de contratos:
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date
+import calendar
 
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
@@ -16,6 +17,69 @@ from django.utils import timezone
 from .models import Contrato, EstadoMensual, AumentoMensual, EstadoPago, TipoAumentoHistorico
 
 logger = logging.getLogger('contratos')
+
+
+def _calcular_dias_atraso(estado_mensual: EstadoMensual, fecha_referencia: date | None = None) -> int:
+    fecha = fecha_referencia or timezone.localdate()
+    return max((fecha - estado_mensual.fecha_vencimiento).days, 0)
+
+
+def _aplicar_mora_en_mes(
+    estado_mensual: EstadoMensual,
+    porcentaje: Decimal,
+    aplicado_por: str = '',
+    dias_atraso: int | None = None,
+    recargo_mora: Decimal | None = None,
+) -> dict | None:
+    if estado_mensual.estado == EstadoPago.PAGADO:
+        raise ValueError('No se puede aplicar mora a un mes pagado.')
+
+    if estado_mensual.mora_aplicada:
+        raise ValueError('La mora ya fue aplicada para este mes.')
+
+    if dias_atraso is None:
+        dias_atraso = _calcular_dias_atraso(estado_mensual)
+
+    if dias_atraso <= 0:
+        return None
+
+    monto_anterior = estado_mensual.montoFinal
+    if recargo_mora is None:
+        monto_nuevo = calcular_nuevo_monto(monto_anterior, porcentaje)
+        recargo_mora = (monto_nuevo - monto_anterior).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    else:
+        recargo_mora = Decimal(str(recargo_mora)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        monto_nuevo = (monto_anterior + recargo_mora).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    AumentoMensual.objects.create(
+        estadoMensual     = estado_mensual,
+        tipoAumento       = TipoAumentoHistorico.MORA,
+        porcentajeAumento = porcentaje,
+        montoAnterior     = monto_anterior,
+        montoNuevo        = monto_nuevo,
+        razon             = f'Recargo por mora {dias_atraso} dias',
+        aplicadoPor       = aplicado_por,
+    )
+
+    estado_mensual.montoFinal = monto_nuevo
+    estado_mensual.tieneRecargo = True
+    estado_mensual.mora_aplicada = True
+    estado_mensual.dias_atraso = dias_atraso
+    estado_mensual.recargo_mora = recargo_mora
+    estado_mensual.fecha_aplicacion_mora = timezone.now()
+    estado_mensual.save(update_fields=[
+        'montoFinal', 'tieneRecargo', 'mora_aplicada', 'dias_atraso',
+        'recargo_mora', 'fecha_aplicacion_mora', 'updatedAt'
+    ])
+
+    return {
+        'mes': estado_mensual.mes,
+        'anio': estado_mensual.anio,
+        'dias_atraso': estado_mensual.dias_atraso,
+        'recargo_mora': str(estado_mensual.recargo_mora),
+        'montoAnterior': str(monto_anterior),
+        'montoNuevo': str(monto_nuevo),
+    }
 
 
 def generar_meses(contrato: Contrato, sobreescribir: bool = False) -> list:
@@ -161,7 +225,14 @@ def aplicar_aumento(
 
 
 @transaction.atomic
-def aplicar_mora(contrato: Contrato, aplicado_por: str = '') -> list:
+def aplicar_mora(
+    contrato: Contrato,
+    aplicado_por: str = '',
+    mes: int | None = None,
+    anio: int | None = None,
+    dias_atraso: int | None = None,
+    recargo_mora: Decimal | None = None,
+) -> list:
     """
     Aplica recargo por mora según las reglas de negocio:
     - Mes pasado sin pagar → siempre recargo
@@ -174,33 +245,36 @@ def aplicar_mora(contrato: Contrato, aplicado_por: str = '') -> list:
     porcentaje = contrato.valorInteresMora
     resultados = []
 
+    if mes is not None and anio is not None:
+        estado_mensual = contrato.meses.filter(mes=mes - 1, anio=anio).first()
+        if not estado_mensual:
+            raise EstadoMensual.DoesNotExist('No existe el mes indicado para este contrato.')
+
+        resultado = _aplicar_mora_en_mes(
+            estado_mensual=estado_mensual,
+            porcentaje=porcentaje,
+            aplicado_por=aplicado_por,
+            dias_atraso=dias_atraso,
+            recargo_mora=recargo_mora,
+        )
+        return [resultado] if resultado else []
+
     for em in contrato.meses.exclude(estado=EstadoPago.PAGADO):
         if not em.tiene_recargo_calculado:
             continue
 
-        monto_anterior = em.montoFinal
-        monto_nuevo    = calcular_nuevo_monto(monto_anterior, porcentaje)
+        try:
+            resultado = _aplicar_mora_en_mes(
+                estado_mensual=em,
+                porcentaje=porcentaje,
+                aplicado_por=aplicado_por,
+                dias_atraso=_calcular_dias_atraso(em),
+            )
+        except ValueError:
+            continue
 
-        AumentoMensual.objects.create(
-            estadoMensual     = em,
-            tipoAumento       = TipoAumentoHistorico.MORA,
-            porcentajeAumento = porcentaje,
-            montoAnterior     = monto_anterior,
-            montoNuevo        = monto_nuevo,
-            razon             = f'Recargo por mora {porcentaje}%',
-            aplicadoPor       = aplicado_por,
-        )
-
-        em.montoFinal   = monto_nuevo
-        em.tieneRecargo = True
-        em.save(update_fields=['montoFinal', 'tieneRecargo', 'updatedAt'])
-
-        resultados.append({
-            'mes':           em.mes,
-            'anio':          em.anio,
-            'montoAnterior': str(monto_anterior),
-            'montoNuevo':    str(monto_nuevo),
-        })
+        if resultado:
+            resultados.append(resultado)
 
     logger.info('Contrato %s: mora aplicada a %d meses', contrato.pk, len(resultados))
     return resultados
