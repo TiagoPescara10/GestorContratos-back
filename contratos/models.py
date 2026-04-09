@@ -34,6 +34,17 @@ class TipoAumentoHistorico(models.TextChoices):
 
 
 class Contrato(models.Model):
+    @property
+    def aumentos_aplicados(self):
+        """
+        Devuelve una lista de dicts con año y mes donde se aplicó un aumento.
+        Ejemplo: [{'anio': 2025, 'mes': 6}, ...]
+        """
+        return [
+            {'anio': m.anio, 'mes': m.mes + 1}
+            for m in self.meses.filter(aumento_aplicado=True)
+        ]
+
     # Propiedad
     pais          = models.CharField(max_length=100)
     provincia     = models.CharField(max_length=100)
@@ -141,6 +152,9 @@ class EstadoMensual(models.Model):
     honorarios       = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     cargosAdicionales = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     tieneRecargo     = models.BooleanField(default=False)
+    aumento_aplicado = models.BooleanField(default=False)
+
+
     createdAt        = models.DateTimeField(auto_now_add=True)
     updatedAt        = models.DateTimeField(auto_now=True)
 

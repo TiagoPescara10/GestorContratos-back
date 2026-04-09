@@ -142,7 +142,8 @@ def aplicar_aumento(
         )
 
         em.montoFinal = monto_nuevo
-        em.save(update_fields=['montoFinal', 'updatedAt'])
+        em.aumento_aplicado = True
+        em.save(update_fields=['montoFinal', 'aumento_aplicado', 'updatedAt'])
 
         resultados.append({
             'mes':                em.mes,
