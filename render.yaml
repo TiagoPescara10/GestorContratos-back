@@ -1,0 +1,45 @@
+services:
+  # Django Web Server
+  - type: web
+    name: gestor-contratos-api
+    runtime: python
+    plan: starter
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: DB_NAME
+        value: gestor_contratos
+      - key: DB_HOST
+        value: localhost
+      - key: DB_PORT
+        value: 5432
+      - key: DB_USER
+        value: postgres
+      - key: DB_PASSWORD
+        value: postgres
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+  # PostgreSQL Database
+  - type: pserv
+    name: gestor-contratos-db
+    runtime: postgresql
+    plan: starter
+    envVars:
+      - key: POSTGRES_DB
+        value: gestor_contratos
+      - key: POSTGRES_USER
+        value: postgres
+      - key: POSTGRES_PASSWORD
+        value: postgres
+
+databases:
+  - name: gestor-contratos-db
+    databaseName: gestor_contratos
+    user: postgres

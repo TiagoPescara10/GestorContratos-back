@@ -12,6 +12,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     # Apps
+    path('api/auth/', include('usuarios.urls')),
     path('api/', include('contratos.urls')),
     path('api/', include('indices.urls')),
     path('api/', include('estadisticas.urls')),
