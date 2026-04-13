@@ -403,11 +403,12 @@ class ContratoAPITest(APITestCase):
         resp = self.client.get(url)
         self.assertEqual(resp.data['count'], 1)
 
-    def test_dni_duplicado_rechazado(self):
+    def test_dni_duplicado_permitido(self):
         crear_contrato(inquilinoDni='55555555')
         url  = reverse('contrato-list')
         resp = self.client.post(url, self._payload_base(inquilinoDni='55555555'), format='json')
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Contrato.objects.filter(inquilinoDni='55555555').count(), 2)
 
     def test_fecha_fin_menor_que_inicio(self):
         url  = reverse('contrato-list')

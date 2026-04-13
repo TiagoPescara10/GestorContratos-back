@@ -92,17 +92,6 @@ class ContratoDetailSerializer(serializers.ModelSerializer):
                 )
         return data
 
-    def validate_inquilinoDni(self, value):
-        qs = Contrato.objects.filter(inquilinoDni=value, eliminado=False)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError(
-                'Ya existe un contrato activo con este DNI de inquilino.'
-            )
-        return value
-
-
 # ── Serializers de acciones ───────────────────────────────────────────────────
 
 class AplicarAumentoSerializer(serializers.Serializer):

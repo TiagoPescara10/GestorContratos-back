@@ -187,13 +187,6 @@ def importar(ruta_json: str, dry_run: bool = False):
             omitidos += 1
             continue
 
-        # Verificar duplicado por DNI inquilino
-        dni = data.get('inquilinoDni', '')
-        if dni and Contrato.objects.filter(inquilinoDni=dni, eliminado=False).exists():
-            print(f"  [{i}] ⏭  Omitido — DNI duplicado: {dni}")
-            omitidos += 1
-            continue
-
         if dry_run:
             print(f"  [{i}] ✅ (dry) {data.get('inquilinoNombre')} — {data.get('localidad')}")
             ok += 1
