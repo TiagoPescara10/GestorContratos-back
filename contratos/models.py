@@ -8,6 +8,7 @@ class TipoPropiedad(models.TextChoices):
     OFICINA      = 'oficina',      'Oficina'
     DEPARTAMENTO = 'departamento', 'Departamento'
     CASA         = 'casa',         'Casa'
+    GALPON       = 'galpon',       'Galpon'
 
 
 class TipoAumentoChoice(models.TextChoices):
@@ -49,6 +50,7 @@ class Contrato(models.Model):
     pais          = models.CharField(max_length=100)
     provincia     = models.CharField(max_length=100)
     localidad     = models.CharField(max_length=100)
+    direccion     = models.CharField(max_length=100)
     codigoPostal  = models.CharField(max_length=20, blank=True, default='')
     tipoPropiedad = models.CharField(max_length=20, choices=TipoPropiedad.choices)
 

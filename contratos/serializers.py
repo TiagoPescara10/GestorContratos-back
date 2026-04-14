@@ -46,7 +46,7 @@ class ContratoListSerializer(serializers.ModelSerializer):
         model = Contrato
         fields = [
             'id', 'inquilinoNombre', 'inquilinoDni',
-            'propietarioNombre', 'localidad', 'provincia',
+            'propietarioNombre', 'localidad', 'provincia','direccion',
             'tipoPropiedad', 'valorMensual', 'monedaMensual',
             'fechaInicio', 'fechaFin', 'diaPago', 'duracion',
             'estado', 'dias_restantes', 'frecuenciaAumento', 'createdAt',

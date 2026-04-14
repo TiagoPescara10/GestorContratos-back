@@ -240,3 +240,31 @@ class ContratoViewSet(viewsets.ModelViewSet):
         qs         = self.filter_queryset(self.get_queryset())
         serializer = ContratoListSerializer(qs, many=True)
         return Response(serializer.data)
+    
+    # ── POST /contratos/{id}/recalcular-montos/ ────────────────────────────────
+    @action(detail=True, methods=['post'], url_path='recalcular-montos')
+    def recalcular_montos(self, request, pk=None):
+        contrato = self.get_object()
+        hoy = timezone.localdate()
+
+        meses_futuros = contrato.meses.filter(
+            anio__gt=hoy.year
+        ) | contrato.meses.filter(
+            anio=hoy.year, mes__gte=hoy.month
+        )
+
+        nuevo_valor = Decimal(str(contrato.valorMensual))
+
+        actualizados = 0
+        for mes in meses_futuros.order_by('anio', 'mes'):
+            porcentaje_acumulado = Decimal('1')
+            for aumento in mes.aumentos.exclude(tipoAumento='mora'):
+                porcentaje_acumulado *= (1 + aumento.porcentajeAumento / 100)
+
+            mes.montoBase  = nuevo_valor
+            mes.montoFinal = (nuevo_valor * porcentaje_acumulado).quantize(Decimal('0.01'))
+            mes.save(update_fields=['montoBase', 'montoFinal', 'updatedAt'])
+            actualizados += 1
+
+        logger.info('Contrato %s — %d meses recalculados con base %s', pk, actualizados, nuevo_valor)
+        return Response({'ok': True, 'meses_actualizados': actualizados})
