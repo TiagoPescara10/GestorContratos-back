@@ -245,24 +245,22 @@ class ContratoViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='recalcular-montos')
     def recalcular_montos(self, request, pk=None):
         contrato = self.get_object()
-        hoy = timezone.localdate()
-
-        meses_futuros = contrato.meses.filter(
-            anio__gt=hoy.year
-        ) | contrato.meses.filter(
-            anio=hoy.year, mes__gte=hoy.month
-        )
 
         nuevo_valor = Decimal(str(contrato.valorMensual))
 
         actualizados = 0
-        for mes in meses_futuros.order_by('anio', 'mes'):
+        for mes in contrato.meses.order_by('anio', 'mes'):
             porcentaje_acumulado = Decimal('1')
             for aumento in mes.aumentos.exclude(tipoAumento='mora'):
                 porcentaje_acumulado *= (1 + aumento.porcentajeAumento / 100)
 
+            monto_sin_mora = (nuevo_valor * porcentaje_acumulado).quantize(Decimal('0.01'))
             mes.montoBase  = nuevo_valor
-            mes.montoFinal = (nuevo_valor * porcentaje_acumulado).quantize(Decimal('0.01'))
+            mes.montoFinal = (
+                (monto_sin_mora + mes.recargo_mora).quantize(Decimal('0.01'))
+                if mes.mora_aplicada and mes.recargo_mora
+                else monto_sin_mora
+            )
             mes.save(update_fields=['montoBase', 'montoFinal', 'updatedAt'])
             actualizados += 1
 
