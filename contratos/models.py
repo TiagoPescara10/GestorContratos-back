@@ -95,8 +95,9 @@ class Contrato(models.Model):
     duracion    = models.IntegerField(editable=False, default=0)
 
     # Ajustes
-    frecuenciaAumento     = models.CharField(max_length=20, blank=True, null=True)
-    tipoAumento           = models.CharField(max_length=20, choices=TipoAumentoChoice.choices, blank=True, null=True)
+    frecuenciaAumento      = models.CharField(max_length=20, blank=True, null=True)
+    tipoAumento            = models.CharField(max_length=20, choices=TipoAumentoChoice.choices, blank=True, null=True)
+    porcentajeCasaPropia   = models.DecimalField(max_digits=8, decimal_places=4, null=True, blank=True)
 
     # Ajustes / configuración del contrato
     incluye_iva = models.BooleanField(default=False)
