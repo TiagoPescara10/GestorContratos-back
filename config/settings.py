@@ -83,33 +83,20 @@ if DEBUG:
         }
     }
 else:
-    # TEMPORARY: Use SQLite in production until we get Render DB connection info
-    # This allows the app to work while we fix the database connection
+    # Use Render PostgreSQL with service name
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db_production.sqlite3',
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='gestor_contratos'),
+            'USER': config('DB_USER', default='postgres'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='gestor-contratos-db'),  # Service name
+            'PORT': config('DB_PORT', default='5432'),
+            'OPTIONS': {
+                'connect_timeout': 10,
+            }
         }
     }
-    
-    print("WARNING: Using SQLite in production - NEED TO FIX POSTGRESQL CONNECTION!")
-    
-    # TODO: Replace with Render PostgreSQL connection once we get the correct connection info
-    # if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
-    #     # Use Render's internal service connection with service name
-    #     DATABASES = {
-    #         'default': {
-    #             'ENGINE': 'django.db.backends.postgresql',
-    #             'NAME': config('DB_NAME', default='gestor_contratos'),
-    #             'USER': config('DB_USER', default='postgres'),
-    #             'PASSWORD': config('DB_PASSWORD', default=''),
-    #             'HOST': 'gestor-contratos-db',  # Use service name directly
-    #             'PORT': config('DB_PORT', default='5432'),
-    #             'OPTIONS': {
-    #                 'connect_timeout': 10,
-    #             }
-    #         }
-    #     }
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
