@@ -83,47 +83,33 @@ if DEBUG:
         }
     }
 else:
-    # Check if we're in Render environment
-    if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
-        # Use Render's internal service connection
-        db_host = config('DB_HOST', default='localhost')
-        if not db_host or db_host == 'localhost':
-            # If DB_HOST is not set, use the service name directly
-            db_host = 'gestor-contratos-db'
-        
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': config('DB_NAME', default='gestor_contratos'),
-                'USER': config('DB_USER', default='postgres'),
-                'PASSWORD': config('DB_PASSWORD', default=''),
-                'HOST': db_host,
-                'PORT': config('DB_PORT', default='5432'),
-                'OPTIONS': {
-                    'connect_timeout': 10,
-                }
-            }
+    # TEMPORARY: Use SQLite in production until we get Render DB connection info
+    # This allows the app to work while we fix the database connection
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db_production.sqlite3',
         }
-    else:
-        # Try to use DATABASE_URL first, fallback to individual DB vars
-        import dj_database_url
-        
-        DATABASE_URL = config('DATABASE_URL', default='')
-        if DATABASE_URL:
-            DATABASES = {
-                'default': dj_database_url.parse(DATABASE_URL)
-            }
-        else:
-            DATABASES = {
-                'default': {
-                    'ENGINE': 'django.db.backends.postgresql',
-                    'NAME': config('DB_NAME', default='gestor_contratos'),
-                    'USER': config('DB_USER', default='postgres'),
-                    'PASSWORD': config('DB_PASSWORD', default=''),
-                    'HOST': config('DB_HOST', default='localhost'),
-                    'PORT': config('DB_PORT', default='5432'),
-                }
-            }
+    }
+    
+    print("WARNING: Using SQLite in production - NEED TO FIX POSTGRESQL CONNECTION!")
+    
+    # TODO: Replace with Render PostgreSQL connection once we get the correct connection info
+    # if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
+    #     # Use Render's internal service connection with service name
+    #     DATABASES = {
+    #         'default': {
+    #             'ENGINE': 'django.db.backends.postgresql',
+    #             'NAME': config('DB_NAME', default='gestor_contratos'),
+    #             'USER': config('DB_USER', default='postgres'),
+    #             'PASSWORD': config('DB_PASSWORD', default=''),
+    #             'HOST': 'gestor-contratos-db',  # Use service name directly
+    #             'PORT': config('DB_PORT', default='5432'),
+    #             'OPTIONS': {
+    #                 'connect_timeout': 10,
+    #             }
+    #         }
+    #     }
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
