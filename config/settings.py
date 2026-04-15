@@ -83,19 +83,12 @@ if DEBUG:
         }
     }
 else:
-    # Use Render PostgreSQL with correct connection details - force override
+    # Use Render PostgreSQL with DATABASE_URL
+    import dj_database_url
+    
+    DATABASE_URL = 'postgresql://gestorpostgre:8H9IYSjy9nebhjWjlunVPgOkzGoxXHvO@dpg-d7g25b1o3t8c73ftkvlg-a/gestor_contratos'
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'gestor_contratos',  # Force correct name
-            'USER': 'gestorpostgre',     # Force correct user
-            'PASSWORD': '8H9IYSjy9nebhjWjlunVPgOkzGoxXHvO',  # Force correct password
-            'HOST': 'dpg-d7g25b1o3t8c73ftkvlg-a',  # Force correct internal host
-            'PORT': '5432',
-            'OPTIONS': {
-                'connect_timeout': 10,
-            }
-        }
+        'default': dj_database_url.parse(DATABASE_URL)
     }
 
 AUTH_PASSWORD_VALIDATORS = [
