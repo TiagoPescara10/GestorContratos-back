@@ -158,31 +158,55 @@ CACHES = {
 ARGLY_API_BASE = 'https://api.argly.com.ar/api'
 
 # ── Logging ────────────────────────────────────────────────────────────────────
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
+if DEBUG:
+    # Development: use both console and file logging
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'verbose': {
+                'format': '{levelname} {asctime} {module} {message}',
+                'style': '{',
+            },
         },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'verbose',
+            },
+            'file': {
+                'class': 'logging.FileHandler',
+                'filename': str(BASE_DIR / 'logs' / 'app.log'),
+                'formatter': 'verbose',
+            },
         },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': str(BASE_DIR / 'logs' / 'app.log'),
-            'formatter': 'verbose',
+        'loggers': {
+            'contratos': {'handlers': ['console', 'file'], 'level': 'INFO', 'propagate': False},
+            'indices':   {'handlers': ['console', 'file'], 'level': 'INFO', 'propagate': False},
         },
-    },
-    'loggers': {
-        'contratos': {'handlers': ['console', 'file'], 'level': 'INFO', 'propagate': False},
-        'indices':   {'handlers': ['console', 'file'], 'level': 'INFO', 'propagate': False},
-    },
-}
+    }
+else:
+    # Production: use only console logging (Render captures stdout)
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'verbose': {
+                'format': '{levelname} {asctime} {module} {message}',
+                'style': '{',
+            },
+        },
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'verbose',
+            },
+        },
+        'loggers': {
+            'contratos': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+            'indices':   {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        },
+    }
 
 # JWT Settings
 from datetime import timedelta
