@@ -20,10 +20,11 @@ def run_migrations(request):
         
         if not User.objects.filter(email="giordanoconti@inmobiliaria.com").exists():
             User.objects.create_user(
+                username="giordanoconti",  # Required field
                 email="giordanoconti@inmobiliaria.com",
                 password="giorconti2026$",
-                nombre="GiordanoConti",
-                apellido="Inmobiliaria",
+                first_name="GiordanoConti",
+                last_name="Inmobiliaria",
                 is_staff=False,
                 is_superuser=False
             )
