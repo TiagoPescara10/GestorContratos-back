@@ -15,8 +15,6 @@ services:
         value: gestor-contratos-backend.onrender.com,onrender.com,*.onrender.com
       - key: DB_NAME
         value: gestor_contratos
-      - key: DB_HOST
-        value: gestor-contratos-db
       - key: DB_PORT
         value: 5432
       - key: DB_USER

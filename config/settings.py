@@ -86,13 +86,18 @@ else:
     # Check if we're in Render environment
     if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
         # Use Render's internal service connection
+        db_host = config('DB_HOST', default='localhost')
+        if not db_host or db_host == 'localhost':
+            # If DB_HOST is not set, use the service name directly
+            db_host = 'gestor-contratos-db'
+        
         DATABASES = {
             'default': {
                 'ENGINE': 'django.db.backends.postgresql',
                 'NAME': config('DB_NAME', default='gestor_contratos'),
                 'USER': config('DB_USER', default='postgres'),
                 'PASSWORD': config('DB_PASSWORD', default=''),
-                'HOST': config('DB_HOST', default='localhost'),
+                'HOST': db_host,
                 'PORT': config('DB_PORT', default='5432'),
                 'OPTIONS': {
                     'connect_timeout': 10,
