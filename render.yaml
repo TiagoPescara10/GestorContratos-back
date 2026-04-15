@@ -4,7 +4,7 @@ services:
     name: gestor-contratos-api
     runtime: python
     plan: starter
-    buildCommand: "pip install -r requirements.txt && python manage.py migrate && python manage.py shell < scripts/crear_cliente.py"
+    buildCommand: "pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py shell < scripts/crear_cliente.py"
     startCommand: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"
     envVars:
       - key: DEBUG
@@ -12,7 +12,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_HOSTS
-        sync: false
+        value: gestor-contratos-backend.onrender.com
       - key: DB_NAME
         value: gestor_contratos
       - key: DB_HOST
