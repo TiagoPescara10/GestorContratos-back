@@ -8,10 +8,10 @@ django.setup()
 User = get_user_model()
 
 # Crear usuario para el cliente
-email = "email-del-cliente@dominio.com"  # REEMPLAZAR con email real del cliente
-password = "PasswordSeguro123!"  # REEMPLAZAR con password real del cliente
-nombre = "Nombre"  # REEMPLAZAR con nombre real del cliente
-apellido = "Apellido"  # REEMPLAZAR con apellido real del cliente
+email = "giordanoconti@inmobiliaria.com"  # REEMPLAZAR con email real del cliente
+password = "giorconti2026$"  # REEMPLAZAR con password real del cliente
+nombre = "GiordanoConti"  # REEMPLAZAR con nombre real del cliente
+apellido = "Inmobiliaria"  # REEMPLAZAR con apellido real del cliente
 
 if not User.objects.filter(email=email).exists():
     user = User.objects.create_user(
