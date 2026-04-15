@@ -11,6 +11,44 @@ from .serializers import UsuarioSerializer, LoginSerializer, UsuarioListSerializ
 User = get_user_model()
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def crear_usuario_cliente(request):
+    """Endpoint temporal para crear usuario del cliente"""
+    try:
+        email = "giordanoconti@inmobiliaria.com"
+        password = "giorconti2026$"
+        nombre = "GiordanoConti"
+        apellido = "Inmobiliaria"
+        
+        if User.objects.filter(email=email).exists():
+            return Response({
+                'message': 'Usuario ya existe',
+                'email': email
+            }, status=200)
+        
+        user = User.objects.create_user(
+            email=email,
+            password=password,
+            nombre=nombre,
+            apellido=apellido,
+            is_staff=False,
+            is_superuser=False
+        )
+        
+        return Response({
+            'message': 'Usuario creado exitosamente',
+            'email': email,
+            'nombre': nombre,
+            'apellido': apellido
+        }, status=201)
+        
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=400)
+
+
 class LoginView(generics.GenericAPIView):
     permission_classes = [AllowAny]
     authentication_classes = []  # No authentication required for login
