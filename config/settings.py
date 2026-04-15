@@ -1,6 +1,7 @@
 """
 Django settings para Gestor de Contratos de Alquiler
 """
+import os
 from pathlib import Path
 from decouple import config
 
@@ -11,6 +12,19 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-cambia-esta-clave-en-
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+
+# Additional fallback for Render
+if 'onrender.com' in os.environ.get('RENDER_EXTERNAL_HOSTNAME', ''):
+    ALLOWED_HOSTS.extend([
+        'gestor-contratos-backend.onrender.com',
+        'onrender.com',
+        '*.onrender.com'
+    ])
+
+# Debug: print current configuration
+print(f"DEBUG={DEBUG}")
+print(f"ALLOWED_HOSTS={ALLOWED_HOSTS}")
+print(f"CORS_ALLOWED_ORIGINS={CORS_ALLOWED_ORIGINS}")
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -144,6 +158,10 @@ CORS_ALLOWED_ORIGINS = config(
 # Allow all origins in development
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
+else:
+    # Production CORS settings
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOW_ALL_ORIGINS = False
 
 # ── Caché (filesystem en dev, Redis recomendado en prod) ──────────────────────
 CACHES = {

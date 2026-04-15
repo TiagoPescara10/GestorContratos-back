@@ -12,7 +12,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_HOSTS
-        value: gestor-contratos-backend.onrender.com,*.onrender.com
+        value: gestor-contratos-backend.onrender.com,onrender.com,*.onrender.com
       - key: DB_NAME
         value: gestor_contratos
       - key: DB_HOST

@@ -4,8 +4,10 @@ from .views import (
     LoginView, UsuarioCreateView, UsuarioListView,
     perfil_usuario, actualizar_perfil, crear_usuario_cliente
 )
+from .debug_views import debug_config
 
 urlpatterns = [
+    path('debug/', debug_config, name='debug-config'),
     path('login/', LoginView.as_view(), name='login'),
     path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('crear-usuario-cliente/', crear_usuario_cliente, name='crear-usuario-cliente'),
