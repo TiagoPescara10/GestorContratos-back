@@ -21,10 +21,7 @@ if 'onrender.com' in os.environ.get('RENDER_EXTERNAL_HOSTNAME', ''):
         '*.onrender.com'
     ])
 
-# Debug: print current configuration
-print(f"DEBUG={DEBUG}")
-print(f"ALLOWED_HOSTS={ALLOWED_HOSTS}")
-print(f"CORS_ALLOWED_ORIGINS={CORS_ALLOWED_ORIGINS}")
+# Debug prints will be added after CORS configuration
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -162,6 +159,12 @@ else:
     # Production CORS settings
     CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOW_ALL_ORIGINS = False
+
+# Debug: print current configuration
+print(f"DEBUG={DEBUG}")
+print(f"ALLOWED_HOSTS={ALLOWED_HOSTS}")
+print(f"CORS_ALLOWED_ORIGINS={CORS_ALLOWED_ORIGINS}")
+print(f"CORS_ALLOW_ALL_ORIGINS={CORS_ALLOW_ALL_ORIGINS}")
 
 # ── Caché (filesystem en dev, Redis recomendado en prod) ──────────────────────
 CACHES = {
