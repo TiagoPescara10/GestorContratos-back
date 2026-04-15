@@ -77,7 +77,7 @@ class Contrato(models.Model):
     garanteDni      = models.CharField(max_length=20,  blank=True, null=True)
     garanteTelefono = models.CharField(max_length=20,  blank=True, null=True)
     garanteDocumentoTipo = models.CharField(max_length=50, blank=True, null=True)
-    garanteDocumentoArchivo = models.CharField(max_length=255, blank=True, null=True)
+    garanteDocumentoArchivo = models.FileField(upload_to='garantes/', blank=True, null=True)
 
     # Términos financieros
     valorMensual     = models.DecimalField(max_digits=12, decimal_places=2)
