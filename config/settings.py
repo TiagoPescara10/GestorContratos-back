@@ -83,15 +83,15 @@ if DEBUG:
         }
     }
 else:
-    # Use Render PostgreSQL with correct connection details
+    # Use Render PostgreSQL with correct connection details - force override
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('DB_NAME', default='gestor_contratos'),
-            'USER': config('DB_USER', default='gestorpostgre'),
-            'PASSWORD': config('DB_PASSWORD', default=''),
-            'HOST': config('DB_HOST', default='dpg-d7g25b1o3t8c73ftkvlg-a'),  # Correct internal host
-            'PORT': config('DB_PORT', default='5432'),
+            'NAME': 'gestor_contratos',  # Force correct name
+            'USER': 'gestorpostgre',     # Force correct user
+            'PASSWORD': '8H9IYSjy9nebhjWjlunVPgOkzGoxXHvO',  # Force correct password
+            'HOST': 'dpg-d7g25b1o3t8c73ftkvlg-a',  # Force correct internal host
+            'PORT': '5432',
             'OPTIONS': {
                 'connect_timeout': 10,
             }
