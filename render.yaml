@@ -16,7 +16,7 @@ services:
       - key: DB_NAME
         value: gestor_contratos
       - key: DB_HOST
-        sync: false
+        value: gestor-contratos-db
       - key: DB_PORT
         value: 5432
       - key: DB_USER
