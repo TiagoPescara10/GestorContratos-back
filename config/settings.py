@@ -83,14 +83,14 @@ if DEBUG:
         }
     }
 else:
-    # Use Render PostgreSQL with service name
+    # Use Render PostgreSQL with correct connection details
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': config('DB_NAME', default='gestor_contratos'),
-            'USER': config('DB_USER', default='postgres'),
+            'USER': config('DB_USER', default='gestorpostgre'),
             'PASSWORD': config('DB_PASSWORD', default=''),
-            'HOST': config('DB_HOST', default='gestor-contratos-db'),  # Service name
+            'HOST': config('DB_HOST', default='dpg-d7g25b1o3t8c73ftkvlg-a'),  # Correct internal host
             'PORT': config('DB_PORT', default='5432'),
             'OPTIONS': {
                 'connect_timeout': 10,
