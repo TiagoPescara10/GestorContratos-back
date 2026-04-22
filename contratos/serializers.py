@@ -59,6 +59,7 @@ class ContratoDetailSerializer(serializers.ModelSerializer):
     meses          = EstadoMensualSerializer(many=True, read_only=True)
     valorConceptosExtras = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
     frecuenciaAumento = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    garantes       = serializers.JSONField(default=list, required=False)
 
     aumentos_aplicados = serializers.ReadOnlyField()
     class Meta:

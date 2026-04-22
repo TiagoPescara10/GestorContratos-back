@@ -72,12 +72,15 @@ class Contrato(models.Model):
     propietarioNecesitaFactura = models.BooleanField(default=False)
     propietarioCuit            = models.CharField(max_length=20, blank=True, null=True)
 
-    # Garante
+    # Garante (campos individuales para compatibilidad)
     garanteNombre   = models.CharField(max_length=150, blank=True, null=True)
     garanteDni      = models.CharField(max_length=20,  blank=True, null=True)
     garanteTelefono = models.CharField(max_length=20,  blank=True, null=True)
     garanteDocumentoTipo = models.CharField(max_length=50, blank=True, null=True)
     garanteDocumentoArchivo = models.FileField(upload_to='garantes/', blank=True, null=True)
+    
+    # Garantes (nuevo campo JSON para múltiples garantes)
+    garantes = models.JSONField(default=list, blank=True)
 
     # Términos financieros
     valorMensual     = models.DecimalField(max_digits=12, decimal_places=2)
