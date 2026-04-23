@@ -145,12 +145,13 @@ def aplicar_aumento(
     # Nota: el campo mes se guarda 0-indexed, mientras que date.today().month es 1-indexed.
     filtro_futuro = Q(anio__gt=hoy.year) | Q(anio=hoy.year, mes__gte=hoy.month - 1)
 
-    # Si se especifica mes de inicio, filtrar desde ese mes en adelante
+    # Si se especifica mes de inicio, filtrar solo desde ese mes sin restricción de futuro.
+    # Esto permite aplicar aumentos históricos a meses del pasado.
     if mes_desde and anio_desde:
         mes_idx = mes_desde - 1  # convertir a 0-indexed
         filtro_desde = Q(anio__gt=anio_desde) | Q(anio=anio_desde, mes__gte=mes_idx)
         qs = contrato.meses.exclude(estado=EstadoPago.PAGADO).filter(
-            filtro_futuro & filtro_desde
+            filtro_desde
         ).order_by('anio', 'mes')
     else:
         qs = contrato.meses.exclude(estado=EstadoPago.PAGADO).filter(

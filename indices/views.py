@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status, serializers
 
 from .client import obtener_indice
-from .models import HistorialIndice, IndiceIPC
+from .models import HistorialIndice, IndiceIPC, IndiceICL
 
 
 class IndiceIPCSerializer(serializers.ModelSerializer):
@@ -12,21 +12,22 @@ class IndiceIPCSerializer(serializers.ModelSerializer):
         fields = ['anio', 'mes', 'porcentaje']
 
 
-def _calcular_variaciones(registros):
+def _calcular_variaciones(registros, campo='porcentaje'):
     resultado = []
     anterior = None
     for r in registros:
+        valor = float(getattr(r, campo))
         if anterior is not None:
-            variacion = round((float(r.porcentaje) / float(anterior) - 1) * 100, 2)
+            variacion = round((valor / float(anterior) - 1) * 100, 2)
         else:
             variacion = None
         resultado.append({
             'anio':      r.anio,
             'mes':       r.mes,
-            'nivel':     float(r.porcentaje),
+            'nivel':     valor,
             'variacion': variacion,
         })
-        anterior = r.porcentaje
+        anterior = getattr(r, campo)
     return resultado
 
 
@@ -53,6 +54,13 @@ class IndiceIPCView(APIView):
     def get(self, request):
         qs = IndiceIPC.objects.all()  # ordenado por anio, mes via Meta
         return Response(_calcular_variaciones(qs))
+
+
+class IndiceICLHistoricoView(APIView):
+    """GET /api/indices/icl-historico/ — nivel + variación mensual desde tabla local."""
+    def get(self, request):
+        qs = IndiceICL.objects.all()  # ordenado por anio, mes via Meta
+        return Response(_calcular_variaciones(qs, campo='nivel'))
 
 
 class IndiceICLView(APIView):

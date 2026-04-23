@@ -1,8 +1,9 @@
 from django.urls import path
-from .views import IndiceIPCView, IndiceICLView, HistorialIndicesView
+from .views import IndiceIPCView, IndiceICLView, IndiceICLHistoricoView, HistorialIndicesView
 
 urlpatterns = [
-    path('indices/ipc/',       IndiceIPCView.as_view(),       name='indice-ipc'),
-    path('indices/icl/',       IndiceICLView.as_view(),       name='indice-icl'),
-    path('indices/historial/', HistorialIndicesView.as_view(), name='indice-historial'),
+    path('indices/ipc/',          IndiceIPCView.as_view(),          name='indice-ipc'),
+    path('indices/icl/',          IndiceICLView.as_view(),          name='indice-icl'),
+    path('indices/icl-historico/', IndiceICLHistoricoView.as_view(), name='indice-icl-historico'),
+    path('indices/historial/',    HistorialIndicesView.as_view(),   name='indice-historial'),
 ]
