@@ -166,3 +166,11 @@ class AplicarMoraSerializer(serializers.Serializer):
             )
 
         return data
+
+
+class ReciboSerializer(serializers.Serializer):
+    mes = serializers.CharField(max_length=20)
+    anio = serializers.IntegerField()
+    montoAlquiler = serializers.DecimalField(max_digits=12, decimal_places=2)
+    totalExtras = serializers.DecimalField(max_digits=12, decimal_places=2)
+    honorariosPct = serializers.DecimalField(max_digits=5, decimal_places=2)

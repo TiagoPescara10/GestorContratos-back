@@ -51,6 +51,8 @@ class Contrato(models.Model):
     provincia     = models.CharField(max_length=100)
     localidad     = models.CharField(max_length=100)
     direccion     = models.CharField(max_length=100)
+    piso          = models.CharField(max_length=10, blank=True, null=True, help_text="Número de piso (ej: 4, PB, etc)")
+    departamento  = models.CharField(max_length=10, blank=True, null=True, help_text="Departamento (ej: A, B, C, etc)")
     codigoPostal  = models.CharField(max_length=20, blank=True, default='')
     tipoPropiedad = models.CharField(max_length=20, choices=TipoPropiedad.choices)
 
