@@ -177,7 +177,7 @@ ARGLY_API_BASE = 'https://api.argly.com.ar/api'
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 if DEBUG:
-    # Development: use both console and file logging
+    # Development: use console logging only (temporarily for production debugging)
     LOGGING = {
         'version': 1,
         'disable_existing_loggers': False,
@@ -192,15 +192,10 @@ if DEBUG:
                 'class': 'logging.StreamHandler',
                 'formatter': 'verbose',
             },
-            'file': {
-                'class': 'logging.FileHandler',
-                'filename': str(BASE_DIR / 'logs' / 'app.log'),
-                'formatter': 'verbose',
-            },
         },
         'loggers': {
-            'contratos': {'handlers': ['console', 'file'], 'level': 'INFO', 'propagate': False},
-            'indices':   {'handlers': ['console', 'file'], 'level': 'INFO', 'propagate': False},
+            'contratos': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+            'indices':   {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
         },
     }
 else:
