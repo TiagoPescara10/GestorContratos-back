@@ -44,3 +44,45 @@ def diagnosticar_ipc(request):
         
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+def forzar_carga_ipc(request):
+    """
+    Endpoint temporal para forzar carga de IPC faltante
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    try:
+        # Ejecutar comando corregido
+        from django.core.management import execute_from_command_line
+        from io import StringIO
+        import sys
+        
+        # Capturar output
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+        
+        execute_from_command_line(['manage.py', 'cargar_ipc'])
+        
+        sys.stdout = old_stdout
+        output = captured_output.getvalue()
+        
+        # Verificar resultado
+        from indices.models import IndiceIPC
+        latest = IndiceIPC.objects.order_by('-anio', '-mes').first()
+        total = IndiceIPC.objects.count()
+        
+        return JsonResponse({
+            'status': 'success',
+            'output': output.strip(),
+            'ultima_fecha_bd': f"{latest.anio}-{latest.mes:02d}" if latest else None,
+            'total_registros_bd': total,
+            'mensaje': 'IPC actualizado correctamente'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'error': str(e)
+        }, status=500)

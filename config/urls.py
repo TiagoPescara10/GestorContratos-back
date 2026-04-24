@@ -7,12 +7,13 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
-from core.views import health_check, diagnosticar_ipc
+from core.views import health_check, diagnosticar_ipc, forzar_carga_ipc
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health-check'),
     path('diagnosticar-ipc/', diagnosticar_ipc, name='diagnosticar-ipc'),
+    path('forzar-carga-ipc/', forzar_carga_ipc, name='forzar-carga-ipc'),
 
     # Apps
     path('api/auth/', include('usuarios.urls')),

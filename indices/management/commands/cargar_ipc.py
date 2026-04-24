@@ -7,7 +7,7 @@ from indices.models import IndiceIPC
 
 INDEC_URL = (
     "https://apis.datos.gob.ar/series/api/series/"
-    "?ids=148.3_INIVELNAL_DICI_M_26&format=json"
+    "?ids=148.3_INIVELNAL_DICI_M_26&format=json&limit=1000"
 )
 
 
