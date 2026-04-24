@@ -9,8 +9,6 @@ class IndicesConfig(AppConfig):
     verbose_name = 'Índices'
 
     def ready(self):
-        # Evitar doble arranque con el reloader de desarrollo
-        if os.environ.get('RUN_MAIN') != 'true':
-            return
-        from .scheduler import iniciar_scheduler
-        iniciar_scheduler()
+        # Deshabilitar scheduler temporalmente en producción
+        # TODO: Configurar scheduler apropiadamente para producción
+        pass
