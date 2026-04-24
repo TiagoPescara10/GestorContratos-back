@@ -74,21 +74,22 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database configuration - SQLite for development, PostgreSQL for production
-if DEBUG:
+# Database configuration - Forzar PostgreSQL en producción
+import dj_database_url
+
+# Usar PostgreSQL en Render (ignorar DEBUG temporalmente)
+if 'onrender.com' in os.environ.get('RENDER_EXTERNAL_HOSTNAME', ''):
+    DATABASE_URL = 'postgresql://gestorpostgre:8H9IYSjy9nebhjWjlunVPgOkzGoxXHvO@dpg-d7g25b1o3t8c73ftkvlg-a/gestor_contratos'
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL)
+    }
+else:
+    # Development: usar SQLite
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
-    }
-else:
-    # Use Render PostgreSQL with DATABASE_URL
-    import dj_database_url
-    
-    DATABASE_URL = 'postgresql://gestorpostgre:8H9IYSjy9nebhjWjlunVPgOkzGoxXHvO@dpg-d7g25b1o3t8c73ftkvlg-a/gestor_contratos'
-    DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL)
     }
 
 AUTH_PASSWORD_VALIDATORS = [
