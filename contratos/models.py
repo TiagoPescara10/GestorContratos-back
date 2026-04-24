@@ -9,6 +9,7 @@ class TipoPropiedad(models.TextChoices):
     DEPARTAMENTO = 'departamento', 'Departamento'
     CASA         = 'casa',         'Casa'
     GALPON       = 'galpon',       'Galpon'
+    COCHERA      = 'cochera',      'Cochera'
 
 
 class TipoAumentoChoice(models.TextChoices):

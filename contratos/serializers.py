@@ -62,6 +62,26 @@ class ContratoDetailSerializer(serializers.ModelSerializer):
     garantes       = serializers.JSONField(default=list, required=False)
 
     aumentos_aplicados = serializers.ReadOnlyField()
+
+    def validate_garantes(self, value):
+        import json
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (ValueError, TypeError):
+                raise serializers.ValidationError("garantes debe ser un JSON válido.")
+        if not isinstance(value, list):
+            raise serializers.ValidationError("garantes debe ser una lista.")
+
+        # En edición, preservar documentoArchivo existente si el cliente no lo reenvió
+        if self.instance:
+            anteriores = self.instance.garantes or []
+            for i, garante in enumerate(value):
+                if not garante.get('documentoArchivo') and i < len(anteriores):
+                    garante['documentoArchivo'] = anteriores[i].get('documentoArchivo')
+
+        return value
+
     class Meta:
         model = Contrato
         exclude = ('eliminado', 'eliminadoEn')

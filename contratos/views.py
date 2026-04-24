@@ -55,15 +55,40 @@ class ContratoViewSet(viewsets.ModelViewSet):
             return ContratoListSerializer
         return ContratoDetailSerializer
 
+    def _procesar_archivos_garantes(self, contrato, request):
+        from django.core.files.storage import default_storage
+        from django.core.files.base import ContentFile
+
+        print('[DEBUG] request.FILES keys:', list(request.FILES.keys()))
+
+        garantes = list(contrato.garantes or [])
+        actualizado = False
+
+        for i, garante in enumerate(garantes):
+            archivo = request.FILES.get(f'garanteDocumentoArchivo_{i}')
+            if archivo:
+                nombre = f'garantes/{contrato.pk}_{i}_{archivo.name}'
+                ruta   = default_storage.save(nombre, ContentFile(archivo.read()))
+                garante['documentoArchivo'] = default_storage.url(ruta)
+                actualizado = True
+                print(f'[DEBUG] garante {i} archivo guardado en: {garante["documentoArchivo"]}')
+            elif garante.get('documentoArchivo') is None:
+                # Preservar URL existente si ya tenía archivo (caso edición)
+                pass
+
+        if actualizado:
+            contrato.garantes = garantes
+            contrato.save(update_fields=['garantes'])
+
     def perform_create(self, serializer):
         contrato = serializer.save()
-        # Generar meses automáticamente al crear
+        self._procesar_archivos_garantes(contrato, self.request)
         creados = services.generar_meses(contrato)
         logger.info('Contrato %s creado con %d meses', contrato.pk, len(creados))
 
     def perform_update(self, serializer):
         contrato = serializer.save()
-        # Regenerar meses si cambiaron las fechas
+        self._procesar_archivos_garantes(contrato, self.request)
         services.generar_meses(contrato, sobreescribir=False)
 
     def destroy(self, request, *args, **kwargs):
@@ -286,99 +311,68 @@ class ContratoViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        # Calcular montos
         monto_alquiler = Decimal(str(data['montoAlquiler']))
-        total_extras = Decimal(str(data['totalExtras']))
-        honorarios_pct = Decimal(str(data['honorariosPct']))
-        monto_honorarios = (monto_alquiler * honorarios_pct / 100).quantize(Decimal('0.01'))
-        total_monto = (monto_alquiler - monto_honorarios).quantize(Decimal('0.01'))
+        total_extras   = Decimal(str(data['totalExtras']))
+        total_monto    = (monto_alquiler + total_extras).quantize(Decimal('0.01'))
 
-        # Crear documento
         doc = Document()
-        
-        # Agregar logo si existe
+
         import os
         logo_path = os.path.join(os.path.dirname(__file__), '..', 'logo-inmobiliaria-recibo.jpg')
         if os.path.exists(logo_path):
             doc.add_picture(logo_path, width=Inches(4.0))
-        
-        # Encabezado con datos de la inmobiliaria
+
         header = doc.add_paragraph()
         header.alignment = WD_ALIGN_PARAGRAPH.CENTER
         header.add_run("Martires Riocuartenses N° 1395 – X5800 – Rio Cuarto – Córdoba.\n")
         header.add_run("9 de Julio Nº 483-x6125-Serrano-Córdoba.\n")
         header.add_run("Tel: 358 4864404 o 3385 465877 - E-Mail: inmobiliariagiordanoconti@gmail.com")
-        
-        doc.add_paragraph()  # Espacio
-        
-        # Párrafo principal
-        monto_en_letras = convertir_monto_a_letras(total_monto)
-        
-        # Formatear monto con puntos y comas
+
+        doc.add_paragraph()
+
         def formatear_monto(monto):
             return f"{int(monto):,}".replace(',', '.') + f",{int((monto % 1) * 100):02d}"
-        
-        monto_formateado = formatear_monto(total_monto)
-        monto_alquiler_formateado = formatear_monto(monto_alquiler)
-        monto_honorarios_formateado = formatear_monto(monto_honorarios)
-        
-        # Mapeo de meses en español
+
         meses_espanol = {
             1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
             7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
         }
-        
-        fecha_formateada = f"{contrato.fechaInicio.day} DE {meses_espanol[contrato.fechaInicio.month]} {contrato.fechaInicio.year}"
-        
-        # Construir dirección completa con piso y departamento
+        fecha_formateada = (
+            f"{contrato.fechaInicio.day} DE "
+            f"{meses_espanol[contrato.fechaInicio.month]} {contrato.fechaInicio.year}"
+        )
+
         direccion_completa = contrato.direccion
         if contrato.piso:
             direccion_completa += f" Piso {contrato.piso}"
         if contrato.departamento:
             direccion_completa += f" Dpto. {contrato.departamento}"
-        
+
+        monto_en_letras = convertir_monto_a_letras(monto_alquiler)
         texto_principal = (
-            f"Recibo del la Sra. {contrato.inquilinoNombre.upper()}, DNI Nº {contrato.inquilinoDni}, "
+            f"Recibo de la Sra. {contrato.inquilinoNombre.upper()}, DNI Nº {contrato.inquilinoDni}, "
             f"TEL Nº {contrato.inquilinoTelefono}, EMAIL {getattr(contrato, 'inquilinoEmail', '')}, "
             f"de la ciudad de {contrato.localidad}, provincia de {contrato.provincia} "
-            f"la suma de pesos: {monto_en_letras} ($ {monto_formateado}), por cuenta y orden de terceros, "
-            f"conforme contrato de locación con fecha {fecha_formateada}, "
+            f"la suma de pesos: {monto_en_letras} ($ {formatear_monto(monto_alquiler)}), "
+            f"por cuenta y orden de terceros, conforme contrato de locación con fecha {fecha_formateada}, "
             f"con relación al inmueble ubicado en {direccion_completa}, en concepto de:"
         )
-        
-        parrafo = doc.add_paragraph(texto_principal)
-        doc.add_paragraph()  # Espacio
-        
-        # Líneas de detalle
-        # ALQUILER
-        doc.add_paragraph(f"-ALQUILER {data['mes'].upper()} {data['anio']}…….…....……..…………..……………..…….……...$ {monto_alquiler_formateado}.")
-        
-        # EMOS (siempre "Abona locataria")
+        doc.add_paragraph(texto_principal)
+        doc.add_paragraph()
+
+        doc.add_paragraph(f"-ALQUILER {data['mes'].upper()} {data['anio']}…….…....……..…………..……………..…….……...$ {formatear_monto(monto_alquiler)}.")
         doc.add_paragraph("-EMOS…………………………………………………………..…………………………………………..Abona locataria.")
-        
-        # MUNICIPAL (siempre "Abona locataria")
         doc.add_paragraph("-MUNICIPAL …………………….…………………………………..…………………………………..Abona locataria.")
-        
-        # EXPENSAS
         if total_extras > 0:
             doc.add_paragraph(f"-EXPENSAS…………………………………………………………………………………………………$ {formatear_monto(total_extras)}.")
         else:
             doc.add_paragraph("-EXPENSAS…………………………………………………………………………………………………Abona la locataria.")
-        
-        # SUBTOTAL
-        doc.add_paragraph(f"SUBTOTAL…………………………………………………………………………………………………$ {monto_alquiler_formateado}.")
-        
-        # GTOS ADM
-        doc.add_paragraph(f"-GTOS ADM {honorarios_pct}%..……………………………………………………………………………………………$ {monto_honorarios_formateado}.")
-        
-        # TOTAL
         doc.add_paragraph(f"TOTAL…………………………………………………………………………………………………….$ {formatear_monto(total_monto)}.")
-        
-        doc.add_paragraph()  # Espacio
-        
-        # "Recibí Conforme:" al pie
+
+        doc.add_paragraph()
+
         firma = doc.add_paragraph()
-        firma_run = firma.add_run("Recibí Conforme:")
+        firma_run = firma.add_run("Recibí Conforme: PAGO RECIBIDO MEDIANTE TRANSFERENCIA BANCARIA")
         firma_run.bold = True
         
         # Guardar documento en memoria
@@ -399,108 +393,93 @@ class ContratoViewSet(viewsets.ModelViewSet):
         logger.info('Recibo generado para contrato %s - %s %s', pk, data['mes'], data['anio'])
         return response
 
-        # ---- POST /contratos/{id}/recibo-propietario/ ----
-        @action(detail=True, methods=['post'], url_path='recibo-propietario')
-        def generar_recibo_propietario(self, request, pk=None):
-            """Genera un recibo de pago para propietario/inmobiliaria en formato .docx"""
-            contrato = self.get_object()
-            serializer = ReciboSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            data = serializer.validated_data
+    # ── POST /contratos/{id}/recibo-propietario/ ──────────────────────────────
+    @action(detail=True, methods=['post'], url_path='recibo-propietario')
+    def generar_recibo_propietario(self, request, pk=None):
+        """Genera un recibo de honorarios para el propietario en formato .docx"""
+        contrato = self.get_object()
+        serializer = ReciboSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-            # Calcular montos
-            monto_alquiler = Decimal(str(data['montoAlquiler']))
-            total_extras = Decimal(str(data['totalExtras']))
-            honorarios_pct = Decimal(str(data['honorariosPct']))
-            monto_honorarios = (monto_alquiler * honorarios_pct / 100).quantize(Decimal('0.01'))
-            total_monto = (monto_alquiler - monto_honorarios).quantize(Decimal('0.01'))
+        monto_alquiler   = Decimal(str(data['montoAlquiler']))
+        total_extras     = Decimal(str(data['totalExtras']))
+        honorarios_pct   = Decimal(str(contrato.honorarios or 0))
+        monto_honorarios = (monto_alquiler * honorarios_pct / 100).quantize(Decimal('0.01'))
+        subtotal         = (monto_alquiler + total_extras).quantize(Decimal('0.01'))
+        total_propietario = (subtotal - monto_honorarios).quantize(Decimal('0.01'))
 
-            # Crear documento
-            doc = Document()
-            
-            # Agregar logo si existe
-            import os
-            logo_path = os.path.join(os.path.dirname(__file__), '..', 'logo-inmobiliaria-recibo.jpg')
-            if os.path.exists(logo_path):
-                doc.add_picture(logo_path, width=Inches(4.0))
-            
-            # Encabezado con datos de la inmobiliaria
-            header = doc.add_paragraph()
-            header.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            header.add_run("Martires Riocuartenses N° 1395 - X5800 - Rio Cuarto - Córdoba.\n")
-            header.add_run("9 de Julio Nº 483-x6125-Serrano-Córdoba.\n")
-            header.add_run("Tel: 358 4864404 o 3385 465877 - E-Mail: inmobiliariagiordanoconti@gmail.com")
-            
-            doc.add_paragraph()  # Espacio
-            
-            # Párrafo principal para propietario
-            monto_en_letras = convertir_monto_a_letras(monto_honorarios)
-            
-            # Formatear monto con puntos y comas
-            def formatear_monto(monto):
-                return f"{int(monto):,}".replace(',', '.') + f",{int((monto % 1) * 100):02d}"
-            
-            monto_honorarios_formateado = formatear_monto(monto_honorarios)
-            monto_alquiler_formateado = formatear_monto(monto_alquiler)
-            
-            # Mapeo de meses en español
-            meses_espanol = {
-                1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
-                7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
-            }
-            
-            fecha_formateada = f"{contrato.fechaInicio.day} DE {meses_espanol[contrato.fechaInicio.month]} {contrato.fechaInicio.year}"
-            
-            # Construir dirección completa con piso y departamento
-            direccion_completa = contrato.direccion
-            if contrato.piso:
-                direccion_completa += f" Piso {contrato.piso}"
-            if contrato.departamento:
-                direccion_completa += f" Dpto. {contrato.departamento}"
-            
-            texto_principal = (
-                f"Recibo del Sr./Sra. {contrato.propietarioNombre.upper()}, DNI Nº {contrato.propietarioDni}, "
-                f"la suma de pesos: {monto_en_letras} ($ {monto_honorarios_formateado}), "
-                f"en concepto de honorarios administrativos por gestión del inmueble ubicado en {direccion_completa}, "
-                f"{contrato.localidad}, {contrato.provincia}, correspondiente al alquiler del mes {data['mes'].upper()} {data['anio']}, "
-                f"conforme contrato de locación con fecha {fecha_formateada} "
-                f"con el inquilino {contrato.inquilinoNombre}."
-            )
-            
-            parrafo = doc.add_paragraph(texto_principal)
-            doc.add_paragraph()  # Espacio
-            
-            # Líneas de detalle para propietario
-            # ALQUILER COBRADO
-            doc.add_paragraph(f"-ALQUILER COBRADO {data['mes'].upper()} {data['anio']}..$ {monto_alquiler_formateado}")
-            
-            # HONORARIOS
-            doc.add_paragraph(f"-HONORARIOS ADMINISTRATIVOS ({honorarios_pct}%)...$ {monto_honorarios_formateado}")
-            
-            doc.add_paragraph()  # Espacio
-            
-            # Total
-            doc.add_paragraph(f"TOTAL HONORARIOS RECIBIDOS: $ {monto_honorarios_formateado}")
-            
-            doc.add_paragraph()  # Espacio
-            
-            # "Recibí Conforme:" al pie
-            firma = doc.add_paragraph()
-            firma_run = firma.add_run("Recibí Conforme:")
-            firma_run.bold = True
-            
-            # Guardar documento en memoria
-            buffer = io.BytesIO()
-            doc.save(buffer)
-            buffer.seek(0)
-            
-            # Preparar respuesta
-            filename = f"recibo_propietario_{data['mes']}_{data['anio']}.docx"
-            response = HttpResponse(
-                buffer.getvalue(),
-                content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            )
-            response['Content-Disposition'] = f'attachment; filename="{filename}"'
-            
-            logger.info('Recibo de propietario generado para contrato %s - %s %s', pk, data['mes'], data['anio'])
-            return response
+        doc = Document()
+
+        import os
+        logo_path = os.path.join(os.path.dirname(__file__), '..', 'logo-inmobiliaria-recibo.jpg')
+        if os.path.exists(logo_path):
+            doc.add_picture(logo_path, width=Inches(4.0))
+
+        header = doc.add_paragraph()
+        header.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        header.add_run("Martires Riocuartenses N° 1395 – X5800 – Rio Cuarto – Córdoba.\n")
+        header.add_run("9 de Julio Nº 483-x6125-Serrano-Córdoba.\n")
+        header.add_run("Tel: 358 4864404 o 3385 465877 - E-Mail: inmobiliariagiordanoconti@gmail.com")
+
+        doc.add_paragraph()
+
+        def formatear_monto(monto):
+            return f"{int(monto):,}".replace(',', '.') + f",{int((monto % 1) * 100):02d}"
+
+        meses_espanol = {
+            1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
+            7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
+        }
+        fecha_formateada = (
+            f"{contrato.fechaInicio.day} DE "
+            f"{meses_espanol[contrato.fechaInicio.month]} {contrato.fechaInicio.year}"
+        )
+
+        direccion_completa = contrato.direccion
+        if contrato.piso:
+            direccion_completa += f" Piso {contrato.piso}"
+        if contrato.departamento:
+            direccion_completa += f" Dpto. {contrato.departamento}"
+
+        monto_en_letras = convertir_monto_a_letras(subtotal)
+        texto_principal = (
+            f"Recibo del Sr./Sra. {contrato.propietarioNombre.upper()}, DNI Nº {contrato.propietarioDni}, "
+            f"TEL Nº {contrato.propietarioTelefono or '—'}, "
+            f"la suma de pesos: {monto_en_letras} ($ {formatear_monto(subtotal)}), "
+            f"correspondiente al alquiler del mes {data['mes'].upper()} {data['anio']} del inmueble "
+            f"ubicado en {direccion_completa}, {contrato.localidad}, {contrato.provincia}, conforme "
+            f"contrato de locación con fecha {fecha_formateada} con el inquilino {contrato.inquilinoNombre}."
+        )
+        doc.add_paragraph(texto_principal)
+        doc.add_paragraph()
+
+        doc.add_paragraph(f"-ALQUILER {data['mes'].upper()} {data['anio']}…….…....……..…………..……………..…….……...$ {formatear_monto(monto_alquiler)}.")
+        doc.add_paragraph("-EMOS…………………………………………………………..…………………………………………..Abona locataria.")
+        doc.add_paragraph("-MUNICIPAL …………………….…………………………………..…………………………………..Abona locataria.")
+        if total_extras > 0:
+            doc.add_paragraph(f"-EXPENSAS…………………………………………………………………………………………………$ {formatear_monto(total_extras)}.")
+        else:
+            doc.add_paragraph("-EXPENSAS…………………………………………………………………………………………………Abona la locataria.")
+        doc.add_paragraph(f"SUBTOTAL…………………………………………………………………………………………………$ {formatear_monto(subtotal)}.")
+        doc.add_paragraph(f"-GTOS ADMINIST. {honorarios_pct}%..……………………………………………………………………………………………$ {formatear_monto(monto_honorarios)}.")
+        doc.add_paragraph(f"TOTAL…………………………………………………………………………………………………….$ {formatear_monto(total_propietario)}.")
+
+        doc.add_paragraph()
+
+        firma = doc.add_paragraph()
+        firma.add_run("Recibí Conforme: PAGO REALIZADO MEDIANTE TRANSFERENCIA BANCARIA").bold = True
+
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+
+        filename = f"recibo_propietario_{data['mes']}_{data['anio']}.docx"
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        logger.info('Recibo propietario generado para contrato %s - %s %s', pk, data['mes'], data['anio'])
+        return response
