@@ -7,12 +7,11 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
-from core.views import health_check, cargar_indices
+from core.views import health_check
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health-check'),
-    path('cargar-indices/', cargar_indices, name='cargar-indices'),
 
     # Apps
     path('api/auth/', include('usuarios.urls')),
