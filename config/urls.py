@@ -7,12 +7,11 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
-from core.views import health_check, run_migrations
+from core.views import health_check
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health-check'),
-    path('run-migrations/', run_migrations, name='run-migrations'),
 
     # Apps
     path('api/auth/', include('usuarios.urls')),
