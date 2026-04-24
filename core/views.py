@@ -1,6 +1,7 @@
 from django.http import JsonResponse
 from django.core.management import execute_from_command_line
 from django.db import connection
+from django.views.decorators.csrf import csrf_exempt
 
 def health_check(request):
     """
@@ -8,6 +9,7 @@ def health_check(request):
     """
     return JsonResponse({'status': 'ok'})
 
+@csrf_exempt
 def cargar_indices(request):
     """
     Endpoint temporal para cargar IPC y ICL manualmente
