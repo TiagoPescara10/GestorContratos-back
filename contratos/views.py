@@ -1,16 +1,22 @@
 import logging
 from decimal import Decimal
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.http import HttpResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.core.files.base import ContentFile
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
+import cloudinary
+from cloudinary.utils import cloudinary_url
+
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
+from django.http import HttpResponse
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -77,13 +83,22 @@ class ContratoViewSet(viewsets.ModelViewSet):
                     content,
                     folder="garantes",
                     resource_type="raw",
-                    access_mode="public",
                     type="upload"
                 )
+                
+                # Generar URL firmada con expiración larga (10 años)
+                url_firmada, _ = cloudinary_url(
+                    result['public_id'],
+                    resource_type="raw",
+                    type="upload",
+                    sign_url=True,
+                    expire_at=int((datetime.now() + timedelta(days=3650)).timestamp())
+                )
+                
                 print("Cloudinary result:", result)
-                print("URL guardada:", result.get('secure_url'))
+                print("URL guardada:", url_firmada)
                 print("Resource type en respuesta:", result.get('resource_type'))
-                garante['documentoArchivo'] = result['secure_url']
+                garante['documentoArchivo'] = url_firmada
                 actualizado = True
                 print(f'[DEBUG] garante {i} archivo guardado en: {garante["documentoArchivo"]}')
             elif garante.get('documentoArchivo') is None:
@@ -111,10 +126,20 @@ class ContratoViewSet(viewsets.ModelViewSet):
                     access_mode="public",
                     type="upload"
                 )
+                
+                # Generar URL firmada con expiración larga (10 años)
+                url_firmada, _ = cloudinary_url(
+                    result['public_id'],
+                    resource_type="raw",
+                    type="upload",
+                    sign_url=True,
+                    expire_at=int((datetime.now() + timedelta(days=3650)).timestamp())
+                )
+                
                 print("Cloudinary result (contrato PDF):", result)
-                print("URL guardada (contrato PDF):", result.get('secure_url'))
+                print("URL guardada (contrato PDF):", url_firmada)
                 print("Resource type en respuesta (contrato PDF):", result.get('resource_type'))
-                contrato.contratoPdf = result['secure_url']
+                contrato.contratoPdf = url_firmada
                 contrato.save(update_fields=['contratoPdf'])
                 print(f'[DEBUG] contrato PDF guardado en: {contrato.contratoPdf}')
 
