@@ -1,6 +1,7 @@
 import logging
 from decimal import Decimal
 import io
+import re
 from datetime import datetime, timedelta
 
 from django.shortcuts import get_object_or_404
@@ -86,13 +87,15 @@ class ContratoViewSet(viewsets.ModelViewSet):
                     type="upload"
                 )
                 
-                # Usar URL pública sin firma para permitir visualización en navegador
-                url_publica = result['secure_url']
+                # Usar URL pública sin firma y sin versión para permitir visualización en navegador
+                url = result['secure_url']
+                # Remover el número de versión (v1234567890)
+                url_sin_version = re.sub(r'/v\d+/', '/', url)
                 
                 print("Cloudinary result:", result)
-                print("URL guardada:", url_publica)
+                print("URL guardada:", url_sin_version)
                 print("Resource type en respuesta:", result.get('resource_type'))
-                garante['documentoArchivo'] = url_publica
+                garante['documentoArchivo'] = url_sin_version
                 actualizado = True
                 print(f'[DEBUG] garante {i} archivo guardado en: {garante["documentoArchivo"]}')
             elif garante.get('documentoArchivo') is None:
@@ -121,13 +124,15 @@ class ContratoViewSet(viewsets.ModelViewSet):
                     type="upload"
                 )
                 
-                # Usar URL pública sin firma para permitir visualización en navegador
-                url_publica = result['secure_url']
+                # Usar URL pública sin firma y sin versión para permitir visualización en navegador
+                url = result['secure_url']
+                # Remover el número de versión (v1234567890)
+                url_sin_version = re.sub(r'/v\d+/', '/', url)
                 
                 print("Cloudinary result (contrato PDF):", result)
-                print("URL guardada (contrato PDF):", url_publica)
+                print("URL guardada (contrato PDF):", url_sin_version)
                 print("Resource type en respuesta (contrato PDF):", result.get('resource_type'))
-                contrato.contratoPdf = url_publica
+                contrato.contratoPdf = url_sin_version
                 contrato.save(update_fields=['contratoPdf'])
                 print(f'[DEBUG] contrato PDF guardado en: {contrato.contratoPdf}')
 
