@@ -108,30 +108,24 @@ class ContratoViewSet(viewsets.ModelViewSet):
         if 'contratoPdf' in request.FILES:
             archivo = request.FILES['contratoPdf']
             if archivo:
-                # Usar Cloudinary API directa con configuración optimizada para documentos
                 import cloudinary.uploader
-                archivo.seek(0)  # resetear el puntero al inicio
-                content = archivo.read()
-                print(f"Tamaño del contrato PDF: {len(content)} bytes")
+                extension = os.path.splitext(archivo.name)[1].lower().replace('.', '')
+                nombre_sin_ext = os.path.splitext(archivo.name)[0]
+                archivo.seek(0)
                 result = cloudinary.uploader.upload(
-                    content,
+                    archivo.read(),
                     folder="contratos/pdf",
+                    public_id=f"{contrato.pk}_{nombre_sin_ext}",
+                    format=extension,
                     resource_type="raw",
                     access_mode="public",
                     type="upload"
                 )
-                
-                # Usar URL pública sin firma y sin versión para permitir visualización en navegador
-                url = result['secure_url']
-                # Remover el número de versión (v1234567890)
-                url_sin_version = re.sub(r'/v\d+/', '/', url)
-                
+
                 print("Cloudinary result (contrato PDF):", result)
-                print("URL guardada (contrato PDF):", url_sin_version)
-                print("Resource type en respuesta (contrato PDF):", result.get('resource_type'))
-                contrato.contratoPdf = url_sin_version
+                print("URL guardada (contrato PDF):", result['secure_url'])
+                contrato.contratoPdf = result['secure_url']
                 contrato.save(update_fields=['contratoPdf'])
-                print(f'[DEBUG] contrato PDF guardado en: {contrato.contratoPdf}')
 
     def perform_create(self, serializer):
         contrato = serializer.save()
