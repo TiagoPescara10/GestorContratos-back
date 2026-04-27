@@ -242,11 +242,16 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
-# ── Cloudinary (almacenamiento de archivos en producción) ──────────────────────
-if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
+# ── Cloudinary (almacenamiento de archivos) ────────────────────────────────────
+# Usar Cloudinary siempre que las credenciales estén disponibles
+if config('CLOUDINARY_CLOUD_NAME', default=''):
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
     CLOUDINARY_STORAGE = {
-        'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
-        'API_KEY': os.environ.get('CLOUDINARY_API_KEY'),
-        'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
+        'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME'),
+        'API_KEY': config('CLOUDINARY_API_KEY'),
+        'API_SECRET': config('CLOUDINARY_API_SECRET'),
     }
+else:
+    # Fallback a almacenamiento local si no hay credenciales de Cloudinary
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'

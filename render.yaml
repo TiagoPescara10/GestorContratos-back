@@ -25,6 +25,12 @@ services:
         value: 8H9IYSjy9nebhjWjlunVPgOkzGoxXHvO
       - key: CORS_ALLOWED_ORIGINS
         value: https://gestor-contratos.vercel.app,https://gestor-contratos.vercel.app
+      - key: CLOUDINARY_CLOUD_NAME
+        value: dmnwbg0rj
+      - key: CLOUDINARY_API_KEY
+        value: 657551349873981
+      - key: CLOUDINARY_API_SECRET
+        value: Vtn6NIsLyhG5ncZdvkwB4aLOXGI
 
   # PostgreSQL Database
   - type: pserv

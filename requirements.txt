@@ -13,5 +13,5 @@ dj-database-url>=2.0
 apscheduler>=3.10
 python-docx>=0.8.11
 num2words>=0.5.12
-cloudinary>=1.36
+cloudinary>=1.44
 django-cloudinary-storage>=0.3.0
