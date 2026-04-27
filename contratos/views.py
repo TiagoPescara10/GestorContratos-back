@@ -3,6 +3,7 @@ from decimal import Decimal
 import io
 import re
 from datetime import datetime, timedelta
+import requests as req
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -540,4 +541,24 @@ class ContratoViewSet(viewsets.ModelViewSet):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
         logger.info('Recibo propietario generado para contrato %s - %s %s', pk, data['mes'], data['anio'])
+        return response
+
+    @action(detail=True, methods=['get'], url_path='documento-garante/(?P<indice>[0-9]+)')
+    def documento_garante(self, request, pk=None, indice=None):
+        contrato = self.get_object()
+        garantes = contrato.garantes or []
+        try:
+            garante = garantes[int(indice)]
+        except IndexError:
+            return Response({'error': 'Garante no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+        url = garante.get('documentoArchivo')
+        if not url:
+            return Response({'error': 'El garante no tiene documento'}, status=status.HTTP_404_NOT_FOUND)
+
+        r = req.get(url, timeout=30)
+        content_type = r.headers.get('Content-Type', 'application/octet-stream')
+
+        response = HttpResponse(r.content, content_type=content_type)
+        response['Content-Disposition'] = 'inline; filename="documento"'
         return response
