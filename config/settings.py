@@ -252,9 +252,11 @@ if 'onrender.com' in os.environ.get('RENDER_EXTERNAL_HOSTNAME', ''):
         'API_SECRET': 'Vtn6NIsLyhG5ncZdvkwB4aLOXGI',
         # Configuración para archivos públicos
         'INVALIDATE_ERROR': True,
-        'RESOURCE_TYPE': 'auto',  # Permite PDFs y otros archivos
+        'RESOURCE_TYPE': 'raw',  # Para PDFs y documentos
         'SECURE': True,
         'SIGN_URL': False,  # URLs públicas sin firma
+        'URL_SUFFIX': '',  # Evitar problemas con URLs
+        'CLOUDINARY_URL': 'cloudinary://657551349873981:Vtn6NIsLyhG5ncZdvkwB4aLOXGI@dmnwbg0rj',
     }
 else:
     # Desarrollo - usar variables de entorno
@@ -267,9 +269,10 @@ else:
             'API_SECRET': config('CLOUDINARY_API_SECRET'),
             # Configuración para archivos públicos
             'INVALIDATE_ERROR': True,
-            'RESOURCE_TYPE': 'auto',
+            'RESOURCE_TYPE': 'raw',
             'SECURE': True,
             'SIGN_URL': False,
+            'URL_SUFFIX': '',
         }
     else:
         # Fallback a almacenamiento local
