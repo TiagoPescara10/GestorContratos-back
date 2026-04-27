@@ -76,29 +76,23 @@ class ContratoViewSet(viewsets.ModelViewSet):
         for i, garante in enumerate(garantes):
             archivo = request.FILES.get(f'garanteDocumentoArchivo_{i}')
             if archivo:
-                nombre = f'garantes/{contrato.pk}_{i}_{archivo.name}'
-                # Usar Cloudinary API directa con configuración optimizada para documentos
                 import cloudinary.uploader
-                archivo.seek(0)  # resetear el puntero al inicio
-                content = archivo.read()
-                print(f"Tamaño del archivo: {len(content)} bytes")
+                extension = os.path.splitext(archivo.name)[1].lower().replace('.', '')
+                nombre_sin_ext = os.path.splitext(archivo.name)[0]
+                archivo.seek(0)
                 result = cloudinary.uploader.upload(
-                    content,
+                    archivo.read(),
                     folder="garantes",
+                    public_id=f"{contrato.pk}_{i}_{nombre_sin_ext}",
+                    format=extension,
                     resource_type="raw",
+                    access_mode="public",
                     type="upload"
                 )
-                
-                url = result['secure_url']
-                url = re.sub(r'/v\d+/', '/', url)
-                extension = os.path.splitext(archivo.name)[1].lower()
-                if extension and not url.endswith(extension):
-                    url = url + extension
 
                 print("Cloudinary result:", result)
-                print("URL guardada:", url)
-                print("Resource type en respuesta:", result.get('resource_type'))
-                garante['documentoArchivo'] = url
+                print("URL guardada:", result['secure_url'])
+                garante['documentoArchivo'] = result['secure_url']
                 actualizado = True
                 print(f'[DEBUG] garante {i} archivo guardado en: {garante["documentoArchivo"]}')
             elif garante.get('documentoArchivo') is None:
