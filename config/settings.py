@@ -107,8 +107,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# MEDIA_URL y MEDIA_ROOT se configuran dinámicamente según Cloudinary
 
 # Custom user model
 AUTH_USER_MODEL = 'usuarios.Usuario'
@@ -244,14 +243,18 @@ SIMPLE_JWT = {
 
 # ── Cloudinary (almacenamiento de archivos) ────────────────────────────────────
 # Usar Cloudinary siempre que las credenciales estén disponibles
-if config('CLOUDINARY_CLOUD_NAME', default=''):
+CLOUDINARY_CLOUD_NAME = config('CLOUDINARY_CLOUD_NAME', default='')
+if CLOUDINARY_CLOUD_NAME:
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
     CLOUDINARY_STORAGE = {
-        'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME'),
+        'CLOUD_NAME': CLOUDINARY_CLOUD_NAME,
         'API_KEY': config('CLOUDINARY_API_KEY'),
         'API_SECRET': config('CLOUDINARY_API_SECRET'),
     }
+    # Para Cloudinary, MEDIA_URL apunta a las URLs de Cloudinary
+    MEDIA_URL = 'https://res.cloudinary.com/' + CLOUDINARY_CLOUD_NAME + '/image/upload/'
 else:
     # Fallback a almacenamiento local si no hay credenciales de Cloudinary
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
     MEDIA_URL = '/media/'
     MEDIA_ROOT = BASE_DIR / 'media'
