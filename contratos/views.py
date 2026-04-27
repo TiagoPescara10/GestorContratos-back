@@ -86,19 +86,13 @@ class ContratoViewSet(viewsets.ModelViewSet):
                     type="upload"
                 )
                 
-                # Generar URL firmada con expiración larga (10 años)
-                url_firmada, _ = cloudinary_url(
-                    result['public_id'],
-                    resource_type="raw",
-                    type="upload",
-                    sign_url=True,
-                    expire_at=int((datetime.now() + timedelta(days=3650)).timestamp())
-                )
+                # Usar URL pública sin firma para permitir visualización en navegador
+                url_publica = result['secure_url']
                 
                 print("Cloudinary result:", result)
-                print("URL guardada:", url_firmada)
+                print("URL guardada:", url_publica)
                 print("Resource type en respuesta:", result.get('resource_type'))
-                garante['documentoArchivo'] = url_firmada
+                garante['documentoArchivo'] = url_publica
                 actualizado = True
                 print(f'[DEBUG] garante {i} archivo guardado en: {garante["documentoArchivo"]}')
             elif garante.get('documentoArchivo') is None:
@@ -127,19 +121,13 @@ class ContratoViewSet(viewsets.ModelViewSet):
                     type="upload"
                 )
                 
-                # Generar URL firmada con expiración larga (10 años)
-                url_firmada, _ = cloudinary_url(
-                    result['public_id'],
-                    resource_type="raw",
-                    type="upload",
-                    sign_url=True,
-                    expire_at=int((datetime.now() + timedelta(days=3650)).timestamp())
-                )
+                # Usar URL pública sin firma para permitir visualización en navegador
+                url_publica = result['secure_url']
                 
                 print("Cloudinary result (contrato PDF):", result)
-                print("URL guardada (contrato PDF):", url_firmada)
+                print("URL guardada (contrato PDF):", url_publica)
                 print("Resource type en respuesta (contrato PDF):", result.get('resource_type'))
-                contrato.contratoPdf = url_firmada
+                contrato.contratoPdf = url_publica
                 contrato.save(update_fields=['contratoPdf'])
                 print(f'[DEBUG] contrato PDF guardado en: {contrato.contratoPdf}')
 
