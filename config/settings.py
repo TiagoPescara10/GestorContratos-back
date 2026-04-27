@@ -242,40 +242,25 @@ SIMPLE_JWT = {
 }
 
 # ── Cloudinary (almacenamiento de archivos) ────────────────────────────────────
-# Forzar Cloudinary en producción (Render)
-if 'onrender.com' in os.environ.get('RENDER_EXTERNAL_HOSTNAME', ''):
-    # Producción en Render - forzar Cloudinary
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-    CLOUDINARY_STORAGE = {
-        'CLOUD_NAME': 'dmnwbg0rj',
-        'API_KEY': '657551349873981',
-        'API_SECRET': 'Vtn6NIsLyhG5ncZdvkwB4aLOXGI',
-        # Configuración para archivos públicos
-        'INVALIDATE_ERROR': True,
-        'RESOURCE_TYPE': 'raw',  # Para PDFs y documentos
-        'SECURE': True,
-        'SIGN_URL': False,  # URLs públicas sin firma
-        'URL_SUFFIX': '',  # Evitar problemas con URLs
-        'CLOUDINARY_URL': 'cloudinary://657551349873981:Vtn6NIsLyhG5ncZdvkwB4aLOXGI@dmnwbg0rj',
-    }
-else:
-    # Desarrollo - usar variables de entorno
-    CLOUDINARY_CLOUD_NAME = config('CLOUDINARY_CLOUD_NAME', default='')
-    if CLOUDINARY_CLOUD_NAME:
-        DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-        CLOUDINARY_STORAGE = {
-            'CLOUD_NAME': CLOUDINARY_CLOUD_NAME,
-            'API_KEY': config('CLOUDINARY_API_KEY'),
-            'API_SECRET': config('CLOUDINARY_API_SECRET'),
-            # Configuración para archivos públicos
-            'INVALIDATE_ERROR': True,
-            'RESOURCE_TYPE': 'raw',
-            'SECURE': True,
-            'SIGN_URL': False,
-            'URL_SUFFIX': '',
-        }
-    else:
-        # Fallback a almacenamiento local
-        DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
-        MEDIA_URL = '/media/'
-        MEDIA_ROOT = BASE_DIR / 'media'
+# Configurar Cloudinary para producción y desarrollo
+import cloudinary
+
+# Configurar Cloudinary directamente
+cloudinary.config(
+    cloud_name='dmnwbg0rj',
+    api_key='657551349873981',
+    api_secret='Vtn6NIsLyhG5ncZdvkwB4aLOXGI',
+    secure=True,
+)
+
+# Usar Cloudinary como storage por defecto
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': 'dmnwbg0rj',
+    'API_KEY': '657551349873981',
+    'API_SECRET': 'Vtn6NIsLyhG5ncZdvkwB4aLOXGI',
+    'SECURE': True,
+    'SIGN_URL': False,
+    'RESOURCE_TYPE': 'raw',  # Forzar raw para PDFs y documentos
+    'INVALIDATE_ERROR': True,
+}
