@@ -1,4 +1,5 @@
 import logging
+import os
 from decimal import Decimal
 import io
 import re
@@ -88,15 +89,16 @@ class ContratoViewSet(viewsets.ModelViewSet):
                     type="upload"
                 )
                 
-                # Usar URL pública sin firma y sin versión para permitir visualización en navegador
                 url = result['secure_url']
-                # Remover el número de versión (v1234567890)
-                url_sin_version = re.sub(r'/v\d+/', '/', url)
-                
+                url = re.sub(r'/v\d+/', '/', url)
+                extension = os.path.splitext(archivo.name)[1].lower()
+                if extension and not url.endswith(extension):
+                    url = url + extension
+
                 print("Cloudinary result:", result)
-                print("URL guardada:", url_sin_version)
+                print("URL guardada:", url)
                 print("Resource type en respuesta:", result.get('resource_type'))
-                garante['documentoArchivo'] = url_sin_version
+                garante['documentoArchivo'] = url
                 actualizado = True
                 print(f'[DEBUG] garante {i} archivo guardado en: {garante["documentoArchivo"]}')
             elif garante.get('documentoArchivo') is None:
