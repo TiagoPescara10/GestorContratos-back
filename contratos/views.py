@@ -94,15 +94,41 @@ class ContratoViewSet(viewsets.ModelViewSet):
             contrato.garantes = garantes
             contrato.save(update_fields=['garantes'])
 
+    def _procesar_contrato_pdf(self, contrato, request):
+        """Procesar archivo PDF del contrato con Cloudinary API directa"""
+        if 'contratoPdf' in request.FILES:
+            archivo = request.FILES['contratoPdf']
+            if archivo:
+                # Usar Cloudinary API directa con configuración optimizada para documentos
+                import cloudinary.uploader
+                archivo.seek(0)  # resetear el puntero al inicio
+                content = archivo.read()
+                print(f"Tamaño del contrato PDF: {len(content)} bytes")
+                result = cloudinary.uploader.upload(
+                    content,
+                    folder="contratos/pdf",
+                    resource_type="raw",
+                    access_mode="public",
+                    type="upload"
+                )
+                print("Cloudinary result (contrato PDF):", result)
+                print("URL guardada (contrato PDF):", result.get('secure_url'))
+                print("Resource type en respuesta (contrato PDF):", result.get('resource_type'))
+                contrato.contratoPdf = result['secure_url']
+                contrato.save(update_fields=['contratoPdf'])
+                print(f'[DEBUG] contrato PDF guardado en: {contrato.contratoPdf}')
+
     def perform_create(self, serializer):
         contrato = serializer.save()
         self._procesar_archivos_garantes(contrato, self.request)
+        self._procesar_contrato_pdf(contrato, self.request)
         creados = services.generar_meses(contrato)
         logger.info('Contrato %s creado con %d meses', contrato.pk, len(creados))
 
     def perform_update(self, serializer):
         contrato = serializer.save()
         self._procesar_archivos_garantes(contrato, self.request)
+        self._procesar_contrato_pdf(contrato, self.request)
         services.generar_meses(contrato, sobreescribir=False)
 
     def destroy(self, request, *args, **kwargs):
