@@ -250,6 +250,11 @@ if 'onrender.com' in os.environ.get('RENDER_EXTERNAL_HOSTNAME', ''):
         'CLOUD_NAME': 'dmnwbg0rj',
         'API_KEY': '657551349873981',
         'API_SECRET': 'Vtn6NIsLyhG5ncZdvkwB4aLOXGI',
+        # Configuración para archivos públicos
+        'INVALIDATE_ERROR': True,
+        'RESOURCE_TYPE': 'auto',  # Permite PDFs y otros archivos
+        'SECURE': True,
+        'SIGN_URL': False,  # URLs públicas sin firma
     }
 else:
     # Desarrollo - usar variables de entorno
@@ -260,6 +265,11 @@ else:
             'CLOUD_NAME': CLOUDINARY_CLOUD_NAME,
             'API_KEY': config('CLOUDINARY_API_KEY'),
             'API_SECRET': config('CLOUDINARY_API_SECRET'),
+            # Configuración para archivos públicos
+            'INVALIDATE_ERROR': True,
+            'RESOURCE_TYPE': 'auto',
+            'SECURE': True,
+            'SIGN_URL': False,
         }
     else:
         # Fallback a almacenamiento local
