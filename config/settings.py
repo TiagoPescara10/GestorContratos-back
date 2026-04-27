@@ -253,7 +253,7 @@ cloudinary.config(
     secure=True,
 )
 
-# Usar Cloudinary como storage por defecto
+# Usar Cloudinary como storage por defecto con configuración específica para raw files
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': 'dmnwbg0rj',
@@ -261,6 +261,7 @@ CLOUDINARY_STORAGE = {
     'API_SECRET': 'Vtn6NIsLyhG5ncZdvkwB4aLOXGI',
     'SECURE': True,
     'SIGN_URL': False,
-    'RESOURCE_TYPE': 'raw',  # Forzar raw para PDFs y documentos
+    'RESOURCE_TYPE': 'raw',
     'INVALIDATE_ERROR': True,
+    'MEDIA_TYPE': 'document',
 }
