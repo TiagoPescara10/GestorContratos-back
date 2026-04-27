@@ -7,11 +7,12 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
-from core.views import health_check
+from core.views import health_check, check_cloudinary_config
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health-check'),
+    path('check-cloudinary/', check_cloudinary_config, name='check-cloudinary'),
 
     # Apps
     path('api/auth/', include('usuarios.urls')),
