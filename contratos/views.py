@@ -68,15 +68,19 @@ class ContratoViewSet(viewsets.ModelViewSet):
             archivo = request.FILES.get(f'garanteDocumentoArchivo_{i}')
             if archivo:
                 nombre = f'garantes/{contrato.pk}_{i}_{archivo.name}'
-                # Usar Cloudinary API directa con configuración optimizada
+                # Usar Cloudinary API directa con configuración optimizada para documentos
                 import cloudinary.uploader
                 result = cloudinary.uploader.upload(
                     archivo.read(),
                     folder="garantes",
                     public_id=f"{contrato.pk}{i}_{archivo.name}",
-                    access_mode="public",  # Hacerlo público
-                    resource_type="auto"   # Soportar PDFs e imágenes
+                    resource_type="raw",   # "raw" para PDFs y documentos
+                    access_mode="public",
+                    type="upload"
                 )
+                print("Cloudinary result:", result)
+                print("URL guardada:", result.get('secure_url'))
+                print("Resource type en respuesta:", result.get('resource_type'))
                 garante['documentoArchivo'] = result['secure_url']
                 actualizado = True
                 print(f'[DEBUG] garante {i} archivo guardado en: {garante["documentoArchivo"]}')
