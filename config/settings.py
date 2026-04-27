@@ -242,7 +242,7 @@ SIMPLE_JWT = {
 }
 
 # ── Cloudinary (almacenamiento de archivos) ────────────────────────────────────
-# Usar Cloudinary siempre que las credenciales estén disponibles
+# Usar Cloudinary para todos los archivos
 CLOUDINARY_CLOUD_NAME = config('CLOUDINARY_CLOUD_NAME', default='')
 if CLOUDINARY_CLOUD_NAME:
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
@@ -251,8 +251,8 @@ if CLOUDINARY_CLOUD_NAME:
         'API_KEY': config('CLOUDINARY_API_KEY'),
         'API_SECRET': config('CLOUDINARY_API_SECRET'),
     }
-    # Para Cloudinary, MEDIA_URL apunta a las URLs de Cloudinary
-    MEDIA_URL = 'https://res.cloudinary.com/' + CLOUDINARY_CLOUD_NAME + '/image/upload/'
+    # Para Cloudinary, no necesitamos MEDIA_URL local
+    # Las URLs serán generadas automáticamente por Cloudinary
 else:
     # Fallback a almacenamiento local si no hay credenciales de Cloudinary
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'

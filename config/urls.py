@@ -25,6 +25,4 @@ urlpatterns = [
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
 
-# Servir archivos locales solo en desarrollo con almacenamiento local
-if settings.DEBUG and hasattr(settings, 'MEDIA_ROOT'):
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# No servir archivos locales - usamos Cloudinary
