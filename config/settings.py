@@ -242,19 +242,27 @@ SIMPLE_JWT = {
 }
 
 # ── Cloudinary (almacenamiento de archivos) ────────────────────────────────────
-# Usar Cloudinary para todos los archivos
-CLOUDINARY_CLOUD_NAME = config('CLOUDINARY_CLOUD_NAME', default='')
-if CLOUDINARY_CLOUD_NAME:
+# Forzar Cloudinary en producción (Render)
+if 'onrender.com' in os.environ.get('RENDER_EXTERNAL_HOSTNAME', ''):
+    # Producción en Render - forzar Cloudinary
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
     CLOUDINARY_STORAGE = {
-        'CLOUD_NAME': CLOUDINARY_CLOUD_NAME,
-        'API_KEY': config('CLOUDINARY_API_KEY'),
-        'API_SECRET': config('CLOUDINARY_API_SECRET'),
+        'CLOUD_NAME': 'dmnwbg0rj',
+        'API_KEY': '657551349873981',
+        'API_SECRET': 'Vtn6NIsLyhG5ncZdvkwB4aLOXGI',
     }
-    # Para Cloudinary, no necesitamos MEDIA_URL local
-    # Las URLs serán generadas automáticamente por Cloudinary
 else:
-    # Fallback a almacenamiento local si no hay credenciales de Cloudinary
-    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = BASE_DIR / 'media'
+    # Desarrollo - usar variables de entorno
+    CLOUDINARY_CLOUD_NAME = config('CLOUDINARY_CLOUD_NAME', default='')
+    if CLOUDINARY_CLOUD_NAME:
+        DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+        CLOUDINARY_STORAGE = {
+            'CLOUD_NAME': CLOUDINARY_CLOUD_NAME,
+            'API_KEY': config('CLOUDINARY_API_KEY'),
+            'API_SECRET': config('CLOUDINARY_API_SECRET'),
+        }
+    else:
+        # Fallback a almacenamiento local
+        DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+        MEDIA_URL = '/media/'
+        MEDIA_ROOT = BASE_DIR / 'media'
