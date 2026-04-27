@@ -70,11 +70,13 @@ class ContratoViewSet(viewsets.ModelViewSet):
                 nombre = f'garantes/{contrato.pk}_{i}_{archivo.name}'
                 # Usar Cloudinary API directa con configuración optimizada para documentos
                 import cloudinary.uploader
+                archivo.seek(0)  # resetear el puntero al inicio
+                content = archivo.read()
+                print(f"Tamaño del archivo: {len(content)} bytes")
                 result = cloudinary.uploader.upload(
-                    archivo.read(),
+                    content,
                     folder="garantes",
-                    public_id=f"{contrato.pk}{i}_{archivo.name}",
-                    resource_type="raw",   # "raw" para PDFs y documentos
+                    resource_type="raw",
                     access_mode="public",
                     type="upload"
                 )
