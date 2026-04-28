@@ -2,6 +2,8 @@ from django.http import JsonResponse
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from django.views.decorators.csrf import csrf_exempt
 from contratos.models import Contrato
 
 def health_check(request):
@@ -70,4 +72,85 @@ def check_cloudinary_config(request):
         return JsonResponse({
             'status': 'error',
             'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def cargar_indices(request):
+    """
+    Endpoint especial para cargar índices históricos en producción (Render)
+    ya que no tenemos acceso a la shell en el plan gratuito.
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Método no permitido. Use POST.'
+        }, status=405)
+    
+    try:
+        # Ejecutar comandos de management
+        resultados = {}
+        
+        # Cargar IPC histórico
+        try:
+            call_command('cargar_ipc')
+            resultados['ipc'] = 'success'
+        except Exception as e:
+            resultados['ipc'] = f'error: {str(e)}'
+        
+        # Cargar ICL histórico
+        try:
+            call_command('cargar_icl_historico')
+            resultados['icl'] = 'success'
+        except Exception as e:
+            resultados['icl'] = f'error: {str(e)}'
+        
+        # Cargar Casa Propia histórico
+        try:
+            call_command('cargar_cp_historico')
+            resultados['casa_propia'] = 'success'
+        except Exception as e:
+            resultados['casa_propia'] = f'error: {str(e)}'
+        
+        # Verificar si todo fue exitoso
+        all_success = all(v == 'success' for v in resultados.values())
+        
+        return JsonResponse({
+            'status': 'success' if all_success else 'partial',
+            'resultados': resultados,
+            'message': 'Índices cargados exitosamente' if all_success else 'Algunos índices tuvieron errores'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Error general: {str(e)}'
+        }, status=500)
+
+
+@csrf_exempt
+def forzar_migraciones(request):
+    """
+    Endpoint especial para forzar migraciones en producción (Render)
+    ya que no tenemos acceso a la shell en el plan gratuito.
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Método no permitido. Use POST.'
+        }, status=405)
+    
+    try:
+        # Ejecutar migrate
+        call_command('migrate')
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Migraciones aplicadas exitosamente'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Error al aplicar migraciones: {str(e)}'
         }, status=500)

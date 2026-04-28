@@ -7,12 +7,14 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
-from core.views import health_check, check_cloudinary_config
+from core.views import health_check, check_cloudinary_config, cargar_indices, forzar_migraciones
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health-check'),
     path('check-cloudinary/', check_cloudinary_config, name='check-cloudinary'),
+    path('cargar-indices/', cargar_indices, name='cargar-indices'),
+    path('forzar-migraciones/', forzar_migraciones, name='forzar-migraciones'),
 
     # Apps
     path('api/auth/', include('usuarios.urls')),
