@@ -207,7 +207,7 @@ def iniciar_scheduler():
     )
     scheduler.add_job(
         _cargar_cp,
-        trigger=CronTrigger(day='16-20', hour=8, minute=30),
+        trigger=CronTrigger(day='15-30', hour=8, minute=30),
         id="cargar_cp_mensual",
         replace_existing=True,
     )
@@ -216,6 +216,6 @@ def iniciar_scheduler():
         "[Scheduler] Iniciado — "
         "IPC días 15-30 a las 08:00 | "
         "ICL días 15-30 a las 08:15 | "
-        "Casa Propia días 16-20 a las 08:30 "
+        "Casa Propia días 15-30 a las 08:30 "
         "(hora Argentina)"
     )

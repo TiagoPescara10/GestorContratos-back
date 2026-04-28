@@ -365,7 +365,10 @@ class ContratoViewSet(viewsets.ModelViewSet):
 
         monto_alquiler = Decimal(str(data['montoAlquiler']))
         total_extras   = Decimal(str(data['totalExtras']))
-        total_monto    = (monto_alquiler + total_extras).quantize(Decimal('0.01'))
+        recargo_mora   = Decimal(str(data.get('recargoMora') or 0))
+        dias_atraso    = data.get('diasAtraso') or 0
+        valor_interes  = Decimal(str(data.get('valorInteresMora') or 0))
+        total_monto    = (monto_alquiler + total_extras + recargo_mora).quantize(Decimal('0.01'))
 
         doc = Document()
 
@@ -419,6 +422,8 @@ class ContratoViewSet(viewsets.ModelViewSet):
             doc.add_paragraph(f"-EXPENSAS…………………………………………………………………………………………………$ {formatear_monto(total_extras)}.")
         else:
             doc.add_paragraph("-EXPENSAS…………………………………………………………………………………………………Abona la locataria.")
+        if recargo_mora > 0:
+            doc.add_paragraph(f"-MORA ({dias_atraso} días x {valor_interes}%)………………………………………………………………..$ {formatear_monto(recargo_mora)}.")
         doc.add_paragraph(f"TOTAL…………………………………………………………………………………………………….$ {formatear_monto(total_monto)}.")
 
         doc.add_paragraph()

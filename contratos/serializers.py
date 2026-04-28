@@ -216,8 +216,12 @@ class AplicarMoraSerializer(serializers.Serializer):
 
 
 class ReciboSerializer(serializers.Serializer):
-    mes = serializers.CharField(max_length=20)
-    anio = serializers.IntegerField()
+    mes           = serializers.CharField(max_length=20)
+    anio          = serializers.IntegerField()
     montoAlquiler = serializers.DecimalField(max_digits=12, decimal_places=2)
-    totalExtras = serializers.DecimalField(max_digits=12, decimal_places=2)
+    totalExtras   = serializers.DecimalField(max_digits=12, decimal_places=2)
     honorariosPct = serializers.DecimalField(max_digits=5, decimal_places=2)
+    recargoMora     = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True, default=0)
+    diasAtraso      = serializers.IntegerField(required=False, allow_null=True, default=0)
+    tipoInteresMora = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
+    valorInteresMora = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, allow_null=True, default=0)
