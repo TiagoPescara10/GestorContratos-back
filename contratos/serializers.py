@@ -115,8 +115,17 @@ class ContratoDetailSerializer(serializers.ModelSerializer):
 
 # ── Serializers de acciones ───────────────────────────────────────────────────
 
+_MAPA_TIPO_AUMENTO = {
+    'ipc':             'IPC',
+    'icl':             'ICL',
+    'casa_propia':     'casa_propia',
+    'porcentaje_fijo': 'porcentaje_fijo',
+    'monto_fijo':      'monto_fijo',
+}
+
+
 class AplicarAumentoSerializer(serializers.Serializer):
-    tipoAumento    = serializers.ChoiceField(choices=['IPC', 'ICL', 'casa_propia', 'porcentaje_fijo', 'monto_fijo'])
+    tipoAumento    = serializers.CharField()
     porcentajeFijo = serializers.DecimalField(max_digits=8, decimal_places=4,
                                               required=False, allow_null=True)
     montoFijo      = serializers.DecimalField(max_digits=12, decimal_places=2,
@@ -125,12 +134,21 @@ class AplicarAumentoSerializer(serializers.Serializer):
     anioDesde      = serializers.IntegerField(required=False)
     aplicadoPor    = serializers.CharField(max_length=100, required=False, allow_blank=True)
 
+    def validate_tipoAumento(self, value):
+        normalizado = value.lower()
+        if normalizado not in _MAPA_TIPO_AUMENTO:
+            raise serializers.ValidationError(
+                f'Tipo de aumento inválido: "{value}". '
+                f'Válidos: {list(_MAPA_TIPO_AUMENTO.keys())}'
+            )
+        return _MAPA_TIPO_AUMENTO[normalizado]
+
     def validate(self, data):
         tipo = data.get('tipoAumento')
 
-        if tipo in ('porcentaje_fijo', 'casa_propia') and not data.get('porcentajeFijo'):
+        if tipo == 'porcentaje_fijo' and not data.get('porcentajeFijo'):
             raise serializers.ValidationError(
-                {'porcentajeFijo': 'Requerido cuando tipoAumento es porcentaje_fijo o casa_propia.'}
+                {'porcentajeFijo': 'Requerido cuando tipoAumento es porcentaje_fijo.'}
             )
 
         if tipo == 'monto_fijo' and not data.get('montoFijo'):
@@ -142,7 +160,7 @@ class AplicarAumentoSerializer(serializers.Serializer):
 
 
 class ConfirmarAumentoSerializer(serializers.Serializer):
-    tipoAumento       = serializers.ChoiceField(choices=['IPC', 'ICL', 'casa_propia', 'porcentaje_fijo', 'monto_fijo'])
+    tipoAumento       = serializers.CharField()
     porcentajeAumento = serializers.DecimalField(max_digits=8, decimal_places=4)
     montoFijo         = serializers.DecimalField(max_digits=12, decimal_places=2,
                                                  required=False, allow_null=True)
@@ -154,6 +172,15 @@ class ConfirmarAumentoSerializer(serializers.Serializer):
     anioDesde         = serializers.IntegerField(required=False)
     razon             = serializers.CharField(max_length=300, required=False, allow_blank=True)
     aplicadoPor       = serializers.CharField(max_length=100, required=False, allow_blank=True)
+
+    def validate_tipoAumento(self, value):
+        normalizado = value.lower()
+        if normalizado not in _MAPA_TIPO_AUMENTO:
+            raise serializers.ValidationError(
+                f'Tipo de aumento inválido: "{value}". '
+                f'Válidos: {list(_MAPA_TIPO_AUMENTO.keys())}'
+            )
+        return _MAPA_TIPO_AUMENTO[normalizado]
 
 
 class AplicarMoraSerializer(serializers.Serializer):

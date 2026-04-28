@@ -33,6 +33,22 @@ class IndiceICL(models.Model):
         return f"ICL {self.anio}/{self.mes:02d}: {self.nivel}"
 
 
+class IndiceCP(models.Model):
+    anio                = models.IntegerField()
+    mes                 = models.IntegerField()  # 1-12
+    nivel               = models.DecimalField(max_digits=10, decimal_places=4)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('anio', 'mes')
+        ordering        = ['anio', 'mes']
+        verbose_name        = 'Índice Casa Propia'
+        verbose_name_plural = 'Índices Casa Propia'
+
+    def __str__(self):
+        return f"CP {self.anio}/{self.mes:02d}: {self.nivel}"
+
+
 class HistorialIndice(models.Model):
     """Registro de cada consulta a la API de índices."""
     tipo      = models.CharField(max_length=10)   # 'IPC' | 'ICL'

@@ -17,11 +17,15 @@ BASE_URL  = getattr(settings, 'ARGLY_API_BASE', 'https://api.argly.com.ar/api')
 
 def obtener_indice(tipo: str) -> dict:
     """
-    Obtiene el índice 'IPC' o 'ICL' desde la API o caché.
+    Obtiene el índice 'IPC', 'ICL' o 'CASA_PROPIA' desde la API o caché.
+    Casa Propia se lee directamente de la tabla local IndiceCP.
     Retorna dict: { tipo, valor, anterior, fecha, raw } o { error }.
     """
     tipo  = tipo.upper()
     ahora = time.time()
+
+    if tipo == 'CASA_PROPIA':
+        return _obtener_cp_desde_db()
 
     cached = _cache.get(tipo)
     if cached and (ahora - cached['ts']) < CACHE_TTL:
@@ -47,6 +51,35 @@ def obtener_indice(tipo: str) -> dict:
     _cache[tipo] = {'ts': ahora, 'data': data}
     logger.info('Índice %s actualizado: %s', tipo, data.get('valor'))
     return data
+
+
+def _obtener_cp_desde_db() -> dict:
+    """Lee el último y penúltimo mes de IndiceCP y devuelve el formato estándar."""
+    try:
+        from indices.models import IndiceCP
+        ultimos = list(IndiceCP.objects.order_by('-anio', '-mes')[:2])
+    except Exception as exc:
+        logger.error('Error al consultar IndiceCP: %s', exc)
+        return {'error': f'Error al consultar IndiceCP: {exc}'}
+
+    if not ultimos:
+        return {'error': 'No hay datos del Índice Casa Propia en la base de datos.'}
+
+    ultimo   = ultimos[0]
+    anterior = ultimos[1] if len(ultimos) > 1 else None
+
+    valor    = round((float(ultimo.nivel) - 1) * 100, 4)
+    ant_val  = round((float(anterior.nivel) - 1) * 100, 4) if anterior else 0.0
+    fecha    = f"{ultimo.anio}-{ultimo.mes:02d}"
+
+    logger.info('Índice CASA_PROPIA desde DB: %s = %s%%', fecha, valor)
+    return {
+        'tipo':     'CASA_PROPIA',
+        'valor':    valor,
+        'anterior': ant_val,
+        'fecha':    fecha,
+        'raw':      {},
+    }
 
 
 def _normalizar(tipo: str, raw) -> dict:

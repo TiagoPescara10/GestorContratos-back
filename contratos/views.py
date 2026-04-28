@@ -253,6 +253,9 @@ class ContratoViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='confirmar-aumento')
     def confirmar_aumento(self, request, pk=None):
         """Aplica el aumento confirmado a los meses correspondientes."""
+        print("DATA recibida:", request.data)
+        print("tipoAumento:", request.data.get('tipoAumento'))
+        print("porcentajeAumento:", request.data.get('porcentajeAumento'))
         contrato   = self.get_object()
         serializer = ConfirmarAumentoSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status, serializers
 
 from .client import obtener_indice
-from .models import HistorialIndice, IndiceIPC, IndiceICL
+from .models import HistorialIndice, IndiceIPC, IndiceICL, IndiceCP
 
 
 class IndiceIPCSerializer(serializers.ModelSerializer):
@@ -71,6 +71,21 @@ class IndiceICLView(APIView):
             return Response(data, status=status.HTTP_502_BAD_GATEWAY)
         _guardar_historial(data)
         return Response(data)
+
+
+class IndiceCPView(APIView):
+    """GET /api/indices/casa-propia/ — coeficiente mensual + variacion = (nivel-1)*100."""
+    def get(self, request):
+        resultado = []
+        for r in IndiceCP.objects.all():
+            nivel = float(r.nivel)
+            resultado.append({
+                'anio':      r.anio,
+                'mes':       r.mes,
+                'nivel':     nivel,
+                'variacion': round((nivel - 1) * 100, 2),
+            })
+        return Response(resultado)
 
 
 class HistorialIndicesView(APIView):
