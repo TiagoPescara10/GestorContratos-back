@@ -1,3 +1,4 @@
+import json
 from django.http import JsonResponse
 from django.conf import settings
 from django.core.files.storage import default_storage
@@ -153,4 +154,60 @@ def forzar_migraciones(request):
         return JsonResponse({
             'status': 'error',
             'message': f'Error al aplicar migraciones: {str(e)}'
+        }, status=500)
+
+
+@csrf_exempt
+def actualizar_indices(request):
+    """
+    Endpoint para actualizar índices actuales (alternativa a cron jobs)
+    Permite actualizar IPC, ICL y Casa Propia individualmente o todos.
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Método no permitido. Use POST.'
+        }, status=405)
+    
+    try:
+        # Obtener parámetro para saber qué índice actualizar
+        data = json.loads(request.body) if request.body else {}
+        indice_tipo = data.get('tipo', 'todos')  # 'ipc', 'icl', 'casa_propia', 'todos'
+        
+        resultados = {}
+        
+        if indice_tipo in ['ipc', 'todos']:
+            try:
+                call_command('cargar_ipc')
+                resultados['ipc'] = 'success'
+            except Exception as e:
+                resultados['ipc'] = f'error: {str(e)}'
+        
+        if indice_tipo in ['icl', 'todos']:
+            try:
+                call_command('cargar_icl')
+                resultados['icl'] = 'success'
+            except Exception as e:
+                resultados['icl'] = f'error: {str(e)}'
+        
+        if indice_tipo in ['casa_propia', 'todos']:
+            try:
+                call_command('cargar_cp')
+                resultados['casa_propia'] = 'success'
+            except Exception as e:
+                resultados['casa_propia'] = f'error: {str(e)}'
+        
+        # Verificar si todo fue exitoso
+        all_success = all(v == 'success' for v in resultados.values())
+        
+        return JsonResponse({
+            'status': 'success' if all_success else 'partial',
+            'resultados': resultados,
+            'message': f'Índices actualizados: {indice_tipo}' if all_success else 'Algunos índices tuvieron errores'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Error general: {str(e)}'
         }, status=500)
