@@ -45,7 +45,7 @@ class ContratoListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contrato
         fields = [
-            'id', 'inquilinoNombre', 'inquilinoDni',
+            'id', 'usuario', 'inquilinoNombre', 'inquilinoDni',
             'propietarioNombre', 'localidad', 'provincia','direccion',
             'tipoPropiedad', 'valorMensual', 'monedaMensual',
             'fechaInicio', 'fechaFin', 'diaPago', 'duracion',
@@ -85,7 +85,7 @@ class ContratoDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contrato
         exclude = ('eliminado', 'eliminadoEn')
-        read_only_fields = ('duracion', 'createdAt', 'updatedAt')
+        read_only_fields = ('duracion', 'createdAt', 'updatedAt', 'usuario')
         # valorConceptosExtras se incluye automáticamente por el campo declarado arriba
 
     def validate(self, data):

@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
+from usuarios.models import Usuario
 
 
 class TipoPropiedad(models.TextChoices):
@@ -36,6 +37,8 @@ class TipoAumentoHistorico(models.TextChoices):
 
 
 class Contrato(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='contratos', null=True, blank=True)
+    
     @property
     def aumentos_aplicados(self):
         """
@@ -145,6 +148,11 @@ class Contrato(models.Model):
     def dias_restantes(self):
         return (self.fechaFin - timezone.localdate()).days
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if not self.usuario_id:
+            raise ValidationError('El contrato debe tener un usuario asignado.')
+    
     def save(self, *args, **kwargs):
         from dateutil.relativedelta import relativedelta
         delta = relativedelta(self.fechaFin, self.fechaInicio)
