@@ -363,8 +363,12 @@ class ContratoViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        monto_alquiler = Decimal(str(data['montoAlquiler']))
-        total_extras   = Decimal(str(data['totalExtras']))
+        monto_alquiler  = Decimal(str(data['montoAlquiler']))
+        conceptos       = list(contrato.conceptosExtras or []) or data.get('conceptosExtras') or []
+        if conceptos:
+            total_extras = sum(Decimal(str(item.get('precio', item.get('valor', 0)))) for item in conceptos)
+        else:
+            total_extras = Decimal(str(data.get('totalExtras') or 0))
         recargo_mora   = Decimal(str(data.get('recargoMora') or 0))
         dias_atraso    = data.get('diasAtraso') or 0
         valor_interes  = Decimal(str(data.get('valorInteresMora') or 0))
@@ -415,16 +419,25 @@ class ContratoViewSet(viewsets.ModelViewSet):
         doc.add_paragraph(texto_principal)
         doc.add_paragraph()
 
-        doc.add_paragraph(f"-ALQUILER {data['mes'].upper()} {data['anio']}…….…....……..…………..……………..…….……...$ {formatear_monto(monto_alquiler)}.")
-        doc.add_paragraph("-EMOS…………………………………………………………..…………………………………………..Abona locataria.")
-        doc.add_paragraph("-MUNICIPAL …………………….…………………………………..…………………………………..Abona locataria.")
-        if total_extras > 0:
-            doc.add_paragraph(f"-EXPENSAS…………………………………………………………………………………………………$ {formatear_monto(total_extras)}.")
+        PUNTOS = "…………………………………………………………………………………………………………………………………………………………………"
+        doc.add_paragraph(f"-ALQUILER {data['mes'].upper()} {data['anio']}{PUNTOS}$ {formatear_monto(monto_alquiler)}.")
+        doc.add_paragraph(f"-EMOS{PUNTOS}Abona locataria.")
+        doc.add_paragraph(f"-MUNICIPAL{PUNTOS}Abona locataria.")
+        if conceptos:
+            for item in conceptos:
+                nombre = str(item.get('nombre', item.get('concepto', 'EXTRA'))).upper()
+                valor  = Decimal(str(item.get('precio', item.get('valor', 0))))
+                if valor > 0:
+                    doc.add_paragraph(f"-{nombre}{PUNTOS}$ {formatear_monto(valor)}.")
+                else:
+                    doc.add_paragraph(f"-{nombre}{PUNTOS}Abona la locataria.")
+        elif total_extras > 0:
+            doc.add_paragraph(f"-EXPENSAS{PUNTOS}$ {formatear_monto(total_extras)}.")
         else:
-            doc.add_paragraph("-EXPENSAS…………………………………………………………………………………………………Abona la locataria.")
+            doc.add_paragraph(f"-EXPENSAS{PUNTOS}Abona la locataria.")
         if recargo_mora > 0:
-            doc.add_paragraph(f"-MORA ({dias_atraso} días x {valor_interes}%)………………………………………………………………..$ {formatear_monto(recargo_mora)}.")
-        doc.add_paragraph(f"TOTAL…………………………………………………………………………………………………….$ {formatear_monto(total_monto)}.")
+            doc.add_paragraph(f"-MORA ({dias_atraso} días x {valor_interes}%){PUNTOS}$ {formatear_monto(recargo_mora)}.")
+        doc.add_paragraph(f"TOTAL{PUNTOS}$ {formatear_monto(total_monto)}.")
 
         doc.add_paragraph()
 
@@ -460,10 +473,9 @@ class ContratoViewSet(viewsets.ModelViewSet):
         data = serializer.validated_data
 
         monto_alquiler   = Decimal(str(data['montoAlquiler']))
-        total_extras     = Decimal(str(data['totalExtras']))
         honorarios_pct   = Decimal(str(contrato.honorarios or 0))
         monto_honorarios = (monto_alquiler * honorarios_pct / 100).quantize(Decimal('0.01'))
-        subtotal         = (monto_alquiler + total_extras).quantize(Decimal('0.01'))
+        subtotal         = monto_alquiler.quantize(Decimal('0.01'))
         total_propietario = (subtotal - monto_honorarios).quantize(Decimal('0.01'))
 
         doc = Document()
@@ -511,16 +523,13 @@ class ContratoViewSet(viewsets.ModelViewSet):
         doc.add_paragraph(texto_principal)
         doc.add_paragraph()
 
-        doc.add_paragraph(f"-ALQUILER {data['mes'].upper()} {data['anio']}…….…....……..…………..……………..…….……...$ {formatear_monto(monto_alquiler)}.")
-        doc.add_paragraph("-EMOS…………………………………………………………..…………………………………………..Abona locataria.")
-        doc.add_paragraph("-MUNICIPAL …………………….…………………………………..…………………………………..Abona locataria.")
-        if total_extras > 0:
-            doc.add_paragraph(f"-EXPENSAS…………………………………………………………………………………………………$ {formatear_monto(total_extras)}.")
-        else:
-            doc.add_paragraph("-EXPENSAS…………………………………………………………………………………………………Abona la locataria.")
-        doc.add_paragraph(f"SUBTOTAL…………………………………………………………………………………………………$ {formatear_monto(subtotal)}.")
-        doc.add_paragraph(f"-GTOS ADMINIST. {honorarios_pct}%..……………………………………………………………………………………………$ {formatear_monto(monto_honorarios)}.")
-        doc.add_paragraph(f"TOTAL…………………………………………………………………………………………………….$ {formatear_monto(total_propietario)}.")
+        PUNTOS = "…………………………………………………………………………………………………………………………………………………………………"
+        doc.add_paragraph(f"-ALQUILER {data['mes'].upper()} {data['anio']}{PUNTOS}$ {formatear_monto(monto_alquiler)}.")
+        doc.add_paragraph(f"-EMOS{PUNTOS}Abona locataria.")
+        doc.add_paragraph(f"-MUNICIPAL{PUNTOS}Abona locataria.")
+        doc.add_paragraph(f"SUBTOTAL{PUNTOS}$ {formatear_monto(subtotal)}.")
+        doc.add_paragraph(f"-GTOS ADMINIST. {honorarios_pct}%{PUNTOS}$ {formatear_monto(monto_honorarios)}.")
+        doc.add_paragraph(f"TOTAL{PUNTOS}$ {formatear_monto(total_propietario)}.")
 
         doc.add_paragraph()
 
