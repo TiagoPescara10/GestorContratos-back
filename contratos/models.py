@@ -83,7 +83,7 @@ class Contrato(models.Model):
     garanteDni      = models.CharField(max_length=20,  blank=True, null=True)
     garanteTelefono = models.CharField(max_length=20,  blank=True, null=True)
     garanteDocumentoTipo = models.CharField(max_length=50, blank=True, null=True)
-    garanteDocumentoArchivo = models.FileField(upload_to='garantes/', blank=True, null=True)
+    garanteDocumentoArchivo = models.FileField(upload_to='garantes/', max_length=500, blank=True, null=True)
     
     # Garantes (nuevo campo JSON para múltiples garantes)
     garantes = models.JSONField(default=list, blank=True)
@@ -115,7 +115,7 @@ class Contrato(models.Model):
     # Extras y adjunto
     conceptosExtras       = models.JSONField(default=list, blank=True)
     valorConceptosExtras  = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    contratoPdf           = models.FileField(upload_to='contratos/pdf/', null=True, blank=True)
+    contratoPdf           = models.FileField(upload_to='contratos/pdf/', max_length=500, null=True, blank=True)
 
     # Soft delete
     eliminado   = models.BooleanField(default=False)
