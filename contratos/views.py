@@ -88,11 +88,12 @@ class ContratoViewSet(viewsets.ModelViewSet):
                 import cloudinary.uploader
                 extension = os.path.splitext(archivo.name)[1].lower().replace('.', '')
                 nombre_sin_ext = os.path.splitext(archivo.name)[0]
+                nombre_limpio = re.sub(r'[^a-zA-Z0-9_-]', '_', nombre_sin_ext)
                 archivo.seek(0)
                 result = cloudinary.uploader.upload(
                     archivo.read(),
                     folder="garantes",
-                    public_id=f"{contrato.pk}_{i}_{nombre_sin_ext}",
+                    public_id=f"{contrato.pk}_{i}_{nombre_limpio}",
                     format=extension,
                     resource_type="raw",
                     access_mode="public",
@@ -120,11 +121,12 @@ class ContratoViewSet(viewsets.ModelViewSet):
                 import cloudinary.uploader
                 extension = os.path.splitext(archivo.name)[1].lower().replace('.', '')
                 nombre_sin_ext = os.path.splitext(archivo.name)[0]
+                nombre_limpio = re.sub(r'[^a-zA-Z0-9_-]', '_', nombre_sin_ext)
                 archivo.seek(0)
                 result = cloudinary.uploader.upload(
                     archivo.read(),
                     folder="contratos/pdf",
-                    public_id=f"{contrato.pk}_{nombre_sin_ext}",
+                    public_id=f"{contrato.pk}_{nombre_limpio}",
                     format=extension,
                     resource_type="raw",
                     access_mode="public",
