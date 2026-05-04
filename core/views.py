@@ -158,6 +158,77 @@ def forzar_migraciones(request):
 
 
 @csrf_exempt
+def crear_usuario_produccion(request):
+    """
+    Endpoint especial para crear usuarios en producción (Render)
+    ya que no tenemos acceso a la shell en el plan gratuito.
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Método no permitido. Use POST.'
+        }, status=405)
+    
+    try:
+        from django.contrib.auth import get_user_model
+        from usuarios.serializers import UsuarioSerializer
+        
+        User = get_user_model()
+        
+        # Obtener datos del request body
+        data = json.loads(request.body) if request.body else {}
+        
+        email = data.get('email')
+        password = data.get('password')
+        first_name = data.get('first_name', '')
+        last_name = data.get('last_name', '')
+        telefono = data.get('telefono', '')
+        
+        if not email or not password:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Email y password son requeridos'
+            }, status=400)
+        
+        # Verificar si usuario ya existe
+        if User.objects.filter(email=email).exists():
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Usuario con email {email} ya existe'
+            }, status=400)
+        
+        # Crear usuario
+        user = User.objects.create_user(
+            email=email,
+            username=email.split('@')[0],  # Usar parte del email como username
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+            telefono=telefono
+        )
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Usuario creado exitosamente',
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'telefono': user.telefono,
+                'is_active': user.activo,
+                'created_at': user.fecha_creacion.isoformat()
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Error al crear usuario: {str(e)}'
+        }, status=500)
+
+
+@csrf_exempt
 def actualizar_indices(request):
     """
     Endpoint para actualizar índices actuales (alternativa a cron jobs)

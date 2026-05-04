@@ -59,6 +59,15 @@ class ContratoViewSet(viewsets.ModelViewSet):
     ordering        = ['-createdAt']
     parser_classes  = [MultiPartParser, FormParser, JSONParser]
 
+    def get_queryset(self):
+        """
+        Filter contracts by authenticated user.
+        Superusers can see all contracts.
+        """
+        if self.request.user.is_superuser:
+            return Contrato.objects.filter(eliminado=False)
+        return Contrato.objects.filter(usuario=self.request.user, eliminado=False)
+
     def get_serializer_class(self):
         if self.action == 'list':
             return ContratoListSerializer
@@ -128,7 +137,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
                 contrato.save(update_fields=['contratoPdf'])
 
     def perform_create(self, serializer):
-        contrato = serializer.save()
+        contrato = serializer.save(usuario=self.request.user)
         self._procesar_archivos_garantes(contrato, self.request)
         self._procesar_contrato_pdf(contrato, self.request)
         creados = services.generar_meses(contrato)
