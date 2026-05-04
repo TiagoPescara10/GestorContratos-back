@@ -144,16 +144,20 @@ class ContratoViewSet(viewsets.ModelViewSet):
                 contrato.save(update_fields=['contratoPdf'])
 
     def perform_create(self, serializer):
-        # Verificar que el usuario esté autenticado
-        if not self.request.user or not self.request.user.is_authenticated:
-            from rest_framework.exceptions import AuthenticationFailed
-            raise AuthenticationFailed('Usuario no autenticado')
-        
-        contrato = serializer.save(usuario=self.request.user)
-        self._procesar_archivos_garantes(contrato, self.request)
-        self._procesar_contrato_pdf(contrato, self.request)
-        creados = services.generar_meses(contrato)
-        logger.info('Contrato %s creado con %d meses', contrato.pk, len(creados))
+        try:
+            # Verificar que el usuario esté autenticado
+            if not self.request.user or not self.request.user.is_authenticated:
+                from rest_framework.exceptions import AuthenticationFailed
+                raise AuthenticationFailed('Usuario no autenticado')
+            
+            contrato = serializer.save(usuario=self.request.user)
+            self._procesar_archivos_garantes(contrato, self.request)
+            self._procesar_contrato_pdf(contrato, self.request)
+            creados = services.generar_meses(contrato)
+            logger.info('Contrato %s creado con %d meses', contrato.pk, len(creados))
+        except Exception as e:
+            logger.error('ERROR al crear contrato: %s', str(e), exc_info=True)
+            raise
 
     def perform_update(self, serializer):
         contrato = serializer.save()
