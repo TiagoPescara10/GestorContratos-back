@@ -143,6 +143,27 @@ class ContratoViewSet(viewsets.ModelViewSet):
                 contrato.contratoPdf = result['secure_url']
                 contrato.save(update_fields=['contratoPdf'])
 
+    def _procesar_contrato_imagen(self, contrato, request):
+        if 'contratoImagen' in request.FILES:
+            archivo = request.FILES['contratoImagen']
+            if archivo:
+                import cloudinary.uploader
+                extension = os.path.splitext(archivo.name)[1].lower().replace('.', '')
+                nombre_sin_ext = os.path.splitext(archivo.name)[0]
+                nombre_limpio = re.sub(r'[^a-zA-Z0-9_-]', '_', nombre_sin_ext)
+                archivo.seek(0)
+                result = cloudinary.uploader.upload(
+                    archivo.read(),
+                    folder="contratos/imagenes",
+                    public_id=f"{contrato.pk}_{nombre_limpio}",
+                    format=extension,
+                    resource_type="image",
+                    access_mode="public",
+                    type="upload"
+                )
+                contrato.contratoImagen = result['secure_url']
+                contrato.save(update_fields=['contratoImagen'])
+
     def perform_create(self, serializer):
         try:
             # Verificar que el usuario esté autenticado
@@ -153,6 +174,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
             contrato = serializer.save(usuario=self.request.user)
             self._procesar_archivos_garantes(contrato, self.request)
             self._procesar_contrato_pdf(contrato, self.request)
+            self._procesar_contrato_imagen(contrato, self.request)
             creados = services.generar_meses(contrato)
             logger.info('Contrato %s creado con %d meses', contrato.pk, len(creados))
         except Exception as e:
@@ -163,6 +185,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
         contrato = serializer.save()
         self._procesar_archivos_garantes(contrato, self.request)
         self._procesar_contrato_pdf(contrato, self.request)
+        self._procesar_contrato_imagen(contrato, self.request)
         services.generar_meses(contrato, sobreescribir=False)
 
     def destroy(self, request, *args, **kwargs):
