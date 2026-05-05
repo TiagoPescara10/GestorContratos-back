@@ -9,7 +9,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-cambia-esta-clave-en-produccion-abc123xyz')
 
-DEBUG = config('DEBUG', default=False, cast=bool)
+# Manejar el caso especial donde DEBUG tiene valor inválido
+debug_value = config('DEBUG', default=False)
+if isinstance(debug_value, str) and debug_value.lower() in ['warn', 'warning', 'info']:
+    DEBUG = True  # Para desarrollo, tratar estos valores como True
+else:
+    try:
+        DEBUG = config('DEBUG', default=False, cast=bool)
+    except ValueError:
+        DEBUG = True  # Fallback para desarrollo
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
