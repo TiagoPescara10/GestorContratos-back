@@ -403,6 +403,25 @@ class ContratoViewSet(viewsets.ModelViewSet):
         def formatear_monto(monto):
             return f"{int(monto):,}".replace(',', '.') + f",{int((monto % 1) * 100):02d}"
 
+        def linea(label, valor=''):
+            from docx.oxml.ns import qn
+            from docx.oxml import OxmlElement
+            p = doc.add_paragraph()
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
+            pPr = p._p.get_or_add_pPr()
+            tabs_el = OxmlElement('w:tabs')
+            tab = OxmlElement('w:tab')
+            tab.set(qn('w:val'), 'right')
+            tab.set(qn('w:pos'), '9350')
+            tab.set(qn('w:leader'), 'dot')
+            tabs_el.append(tab)
+            pPr.append(tabs_el)
+            p.add_run(label)
+            p.add_run('\t')
+            p.add_run(valor)
+            return p
+
         meses_espanol = {
             1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
             7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
@@ -413,14 +432,14 @@ class ContratoViewSet(viewsets.ModelViewSet):
         )
 
         direccion_completa = contrato.direccion
-        if contrato.piso:
+        if contrato.piso and contrato.piso.strip() not in ('', '-'):
             direccion_completa += f" Piso {contrato.piso}"
-        if contrato.departamento:
+        if contrato.departamento and contrato.departamento.strip() not in ('', '-'):
             direccion_completa += f" Dpto. {contrato.departamento}"
 
         monto_en_letras = convertir_monto_a_letras(monto_alquiler)
         texto_principal = (
-            f"Recibo de la Sra. {contrato.inquilinoNombre.upper()}, DNI Nº {contrato.inquilinoDni}, "
+            f"Recibo del Sr./Sra. {contrato.inquilinoNombre.upper()}, DNI Nº {contrato.inquilinoDni}, "
             f"TEL Nº {contrato.inquilinoTelefono}, EMAIL {getattr(contrato, 'inquilinoEmail', '')}, "
             f"de la ciudad de {contrato.localidad}, provincia de {contrato.provincia} "
             f"la suma de pesos: {monto_en_letras} ($ {formatear_monto(monto_alquiler)}), "
@@ -430,25 +449,26 @@ class ContratoViewSet(viewsets.ModelViewSet):
         doc.add_paragraph(texto_principal)
         doc.add_paragraph()
 
-        PUNTOS = "…………………………………………………………………………………………………………………………………………………………………"
-        doc.add_paragraph(f"-ALQUILER {data['mes'].upper()} {data['anio']}{PUNTOS}$ {formatear_monto(monto_alquiler)}.")
-        doc.add_paragraph(f"-EMOS{PUNTOS}Abona locataria.")
-        doc.add_paragraph(f"-MUNICIPAL{PUNTOS}Abona locataria.")
+        linea(f"-ALQUILER {data['mes'].upper()} {data['anio']}", f"$ {formatear_monto(monto_alquiler)}.")
+        linea("-EMOS", "Abona locataria.")
+        linea("-MUNICIPAL", "Abona locataria.")
         if conceptos:
             for item in conceptos:
                 nombre = str(item.get('nombre', item.get('concepto', 'EXTRA'))).upper()
                 valor  = Decimal(str(item.get('precio', item.get('valor', 0))))
                 if valor > 0:
-                    doc.add_paragraph(f"-{nombre}{PUNTOS}$ {formatear_monto(valor)}.")
+                    linea(f"-{nombre}", f"$ {formatear_monto(valor)}.")
                 else:
-                    doc.add_paragraph(f"-{nombre}{PUNTOS}Abona la locataria.")
+                    linea(f"-{nombre}", "Abona la locataria.")
         elif total_extras > 0:
-            doc.add_paragraph(f"-EXPENSAS{PUNTOS}$ {formatear_monto(total_extras)}.")
+            linea("-EXPENSAS", f"$ {formatear_monto(total_extras)}.")
         else:
-            doc.add_paragraph(f"-EXPENSAS{PUNTOS}Abona la locataria.")
+            linea("-EXPENSAS", "Abona la locataria.")
         if recargo_mora > 0:
-            doc.add_paragraph(f"-MORA ({dias_atraso} días x {valor_interes}%){PUNTOS}$ {formatear_monto(recargo_mora)}.")
-        doc.add_paragraph(f"TOTAL{PUNTOS}$ {formatear_monto(total_monto)}.")
+            linea(f"-MORA ({dias_atraso} días x {valor_interes}%)", f"$ {formatear_monto(recargo_mora)}.")
+        linea("SUBTOTAL", f"$ {formatear_monto(total_monto)}.")
+        linea("-DESCUENTO", "")
+        linea("TOTAL", f"$ {formatear_monto(total_monto)}.")
 
         doc.add_paragraph()
 
@@ -507,6 +527,25 @@ class ContratoViewSet(viewsets.ModelViewSet):
         def formatear_monto(monto):
             return f"{int(monto):,}".replace(',', '.') + f",{int((monto % 1) * 100):02d}"
 
+        def linea(label, valor=''):
+            from docx.oxml.ns import qn
+            from docx.oxml import OxmlElement
+            p = doc.add_paragraph()
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
+            pPr = p._p.get_or_add_pPr()
+            tabs_el = OxmlElement('w:tabs')
+            tab = OxmlElement('w:tab')
+            tab.set(qn('w:val'), 'right')
+            tab.set(qn('w:pos'), '9350')
+            tab.set(qn('w:leader'), 'dot')
+            tabs_el.append(tab)
+            pPr.append(tabs_el)
+            p.add_run(label)
+            p.add_run('\t')
+            p.add_run(valor)
+            return p
+
         meses_espanol = {
             1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
             7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
@@ -517,30 +556,29 @@ class ContratoViewSet(viewsets.ModelViewSet):
         )
 
         direccion_completa = contrato.direccion
-        if contrato.piso:
+        if contrato.piso and contrato.piso.strip() not in ('', '-'):
             direccion_completa += f" Piso {contrato.piso}"
-        if contrato.departamento:
+        if contrato.departamento and contrato.departamento.strip() not in ('', '-'):
             direccion_completa += f" Dpto. {contrato.departamento}"
 
-        monto_en_letras = convertir_monto_a_letras(subtotal)
+        monto_en_letras = convertir_monto_a_letras(monto_alquiler)
         texto_principal = (
-            f"Recibo del Sr./Sra. {contrato.propietarioNombre.upper()}, DNI Nº {contrato.propietarioDni}, "
-            f"TEL Nº {contrato.propietarioTelefono or '—'}, "
-            f"la suma de pesos: {monto_en_letras} ($ {formatear_monto(subtotal)}), "
-            f"correspondiente al alquiler del mes {data['mes'].upper()} {data['anio']} del inmueble "
-            f"ubicado en {direccion_completa}, {contrato.localidad}, {contrato.provincia}, conforme "
-            f"contrato de locación con fecha {fecha_formateada} con el inquilino {contrato.inquilinoNombre}."
+            f"Recibo del Sr./Sra. {contrato.inquilinoNombre.upper()}, DNI Nº {contrato.inquilinoDni}, "
+            f"TEL Nº {contrato.inquilinoTelefono}, EMAIL {getattr(contrato, 'inquilinoEmail', '')}, "
+            f"de la ciudad de {contrato.localidad}, provincia de {contrato.provincia} "
+            f"la suma de pesos: {monto_en_letras} ($ {formatear_monto(monto_alquiler)}), "
+            f"por cuenta y orden de terceros, conforme contrato de locación con fecha {fecha_formateada}, "
+            f"con relación al inmueble ubicado en {direccion_completa}, en concepto de:"
         )
         doc.add_paragraph(texto_principal)
         doc.add_paragraph()
 
-        PUNTOS = "…………………………………………………………………………………………………………………………………………………………………"
-        doc.add_paragraph(f"-ALQUILER {data['mes'].upper()} {data['anio']}{PUNTOS}$ {formatear_monto(monto_alquiler)}.")
-        doc.add_paragraph(f"-EMOS{PUNTOS}Abona locataria.")
-        doc.add_paragraph(f"-MUNICIPAL{PUNTOS}Abona locataria.")
-        doc.add_paragraph(f"SUBTOTAL{PUNTOS}$ {formatear_monto(subtotal)}.")
-        doc.add_paragraph(f"-GTOS ADMINIST. {honorarios_pct}%{PUNTOS}$ {formatear_monto(monto_honorarios)}.")
-        doc.add_paragraph(f"TOTAL{PUNTOS}$ {formatear_monto(total_propietario)}.")
+        linea(f"-ALQUILER {data['mes'].upper()} {data['anio']}", f"$ {formatear_monto(monto_alquiler)}.")
+        linea("-EMOS", "Abona locataria.")
+        linea("-MUNICIPAL", "Abona locataria.")
+        linea("SUBTOTAL", f"$ {formatear_monto(subtotal)}.")
+        linea(f"-GTOS ADMINIST. {honorarios_pct}%", f"$ {formatear_monto(monto_honorarios)}.")
+        linea("TOTAL", f"$ {formatear_monto(total_propietario)}.")
 
         doc.add_paragraph()
 
