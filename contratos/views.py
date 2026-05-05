@@ -434,7 +434,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
 
         monto_en_letras = convertir_monto_a_letras(monto_alquiler)
         texto_principal = (
-            f"Recibo de la Sra. {contrato.inquilinoNombre.upper()}, DNI Nº {contrato.inquilinoDni}, "
+            f"Recibo del Sr./Sra. {contrato.inquilinoNombre.upper()}, DNI Nº {contrato.inquilinoDni}, "
             f"TEL Nº {contrato.inquilinoTelefono}, EMAIL {getattr(contrato, 'inquilinoEmail', '')}, "
             f"de la ciudad de {contrato.localidad}, provincia de {contrato.provincia} "
             f"la suma de pesos: {monto_en_letras} ($ {formatear_monto(monto_alquiler)}), "
