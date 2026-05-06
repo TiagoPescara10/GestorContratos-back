@@ -75,13 +75,17 @@ class ContratoDetailSerializer(serializers.ModelSerializer):
         if not isinstance(value, list):
             raise serializers.ValidationError("garantes debe ser una lista.")
 
-        # En edición, preservar documentoArchivo existente si el cliente no lo reenvió
         if self.instance:
             anteriores = self.instance.garantes or []
             for i, garante in enumerate(value):
-                if not garante.get('documentoArchivo') and i < len(anteriores):
-                    garante['documentoArchivo'] = anteriores[i].get('documentoArchivo')
-
+                if i < len(anteriores):
+                    anterior = anteriores[i]
+                    # Preservar documentos[] si el cliente no mandó nada nuevo
+                    if not garante.get('documentos') and anterior.get('documentos'):
+                        garante['documentos'] = anterior['documentos']
+                    # Preservar documentoArchivo viejo también (backward compat)
+                    if not garante.get('documentoArchivo') and anterior.get('documentoArchivo'):
+                        garante['documentoArchivo'] = anterior['documentoArchivo']
         return value
 
     class Meta:
