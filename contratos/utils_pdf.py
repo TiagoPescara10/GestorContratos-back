@@ -245,21 +245,23 @@ def generar_recibo_propietario_pdf(contrato, data):
     _build_intro(story, styles, contrato, monto_alquiler, mes_nombre, anio)
 
     conceptos_prop = list(contrato.conceptosExtras or []) or data.get('conceptosExtras') or []
-    extras_normales = [c for c in conceptos_prop if str(c.get('nombre', '')).lower() not in ('emos', 'municipal')]
-    item_emos      = next((c for c in conceptos_prop if str(c.get('nombre', '')).lower() == 'emos'), None)
-    item_municipal = next((c for c in conceptos_prop if str(c.get('nombre', '')).lower() == 'municipal'), None)
 
     filas = [
         {"label": f"-ALQUILER {mes_nombre} {anio}", "valor": f"{_formatear_monto(monto_alquiler)}."},
     ]
-    if extras_normales and (item_emos or item_municipal):
-        filas.append({"label": "-EXPENSAS", "valor": "Paga Inquilino."})
-    if item_emos:
-        valor_emos = Decimal(str(item_emos.get('precio', item_emos.get('valor', 0))))
-        filas.append({"label": "-EMOS", "valor": f"{_formatear_monto(valor_emos)}." if valor_emos > 0 else "Abona la locataria."})
-    if item_municipal:
-        valor_mun = Decimal(str(item_municipal.get('precio', item_municipal.get('valor', 0))))
-        filas.append({"label": "-MUNICIPAL", "valor": f"{_formatear_monto(valor_mun)}." if valor_mun > 0 else "Abona la locataria."})
+
+    if conceptos_prop:
+        for item in conceptos_prop:
+            nombre = str(item.get('nombre', item.get('concepto', 'EXTRA'))).upper()
+            valor = Decimal(str(item.get('precio', item.get('valor', 0))))
+            if valor > 0:
+                filas.append({"label": f"-{nombre}", "valor": f"{_formatear_monto(valor)}."})
+            else:
+                filas.append({"label": f"-{nombre}", "valor": "Abona la locataria."})
+    elif total_extras_prop > 0:
+        filas.append({"label": "-EXPENSAS", "valor": f"{_formatear_monto(total_extras_prop)}."})
+    else:
+        filas.append({"label": "-EXPENSAS", "valor": "Abona la locataria."})
     filas += [
         {"label": "SUBTOTAL", "valor": f"{_formatear_monto(subtotal)}.", "separador_arriba": True, "negrita": True},
         {"label": f"-GTOS ADMINIST. {honorarios_pct}%", "valor": f"{_formatear_monto(monto_honorarios)}."},

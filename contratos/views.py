@@ -673,19 +673,20 @@ class ContratoViewSet(viewsets.ModelViewSet):
         doc.add_paragraph()
 
         conceptos_prop = list(contrato.conceptosExtras or []) or data.get('conceptosExtras') or []
-        extras_normales = [c for c in conceptos_prop if str(c.get('nombre', '')).lower() not in ('emos', 'municipal')]
-        item_emos      = next((c for c in conceptos_prop if str(c.get('nombre', '')).lower() == 'emos'), None)
-        item_municipal = next((c for c in conceptos_prop if str(c.get('nombre', '')).lower() == 'municipal'), None)
 
         linea(f"-ALQUILER {data['mes'].upper()} {data['anio']}", f"$ {formatear_monto(monto_alquiler)}.")
-        if extras_normales and (item_emos or item_municipal):
-            linea("-EXPENSAS", "Paga Inquilino.")
-        if item_emos:
-            valor_emos = Decimal(str(item_emos.get('precio', item_emos.get('valor', 0))))
-            linea("-EMOS", f"$ {formatear_monto(valor_emos)}." if valor_emos > 0 else "Abona la locataria.")
-        if item_municipal:
-            valor_mun = Decimal(str(item_municipal.get('precio', item_municipal.get('valor', 0))))
-            linea("-MUNICIPAL", f"$ {formatear_monto(valor_mun)}." if valor_mun > 0 else "Abona la locataria.")
+        if conceptos_prop:
+            for item in conceptos_prop:
+                nombre = str(item.get('nombre', item.get('concepto', 'EXTRA'))).upper()
+                valor  = Decimal(str(item.get('precio', item.get('valor', 0))))
+                if valor > 0:
+                    linea(f"-{nombre}", f"$ {formatear_monto(valor)}.")
+                else:
+                    linea(f"-{nombre}", "Abona la locataria.")
+        elif total_extras_prop > 0:
+            linea("-EXPENSAS", f"$ {formatear_monto(total_extras_prop)}.")
+        else:
+            linea("-EXPENSAS", "Abona la locataria.")
         linea("SUBTOTAL", f"$ {formatear_monto(subtotal)}.")
         linea(f"-GTOS ADMINIST. {honorarios_pct}%", f"$ {formatear_monto(monto_honorarios)}.")
         linea("TOTAL", f"$ {formatear_monto(total_propietario)}.")
