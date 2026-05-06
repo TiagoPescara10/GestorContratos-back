@@ -36,6 +36,7 @@ from .serializers import (
 )
 from .filters import ContratoFilter
 from . import services
+from .utils_pdf import generar_recibo_inquilino_pdf, generar_recibo_propietario_pdf
 from indices.client import obtener_indice
 
 logger = logging.getLogger('contratos')
@@ -630,6 +631,41 @@ class ContratoViewSet(viewsets.ModelViewSet):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
         logger.info('Recibo propietario generado para contrato %s - %s %s', pk, data['mes'], data['anio'])
+        return response
+
+    # ── POST /contratos/{id}/recibo-pdf/ ──────────────────────────────────────
+    @action(detail=True, methods=['post'], url_path='recibo-pdf')
+    def generar_recibo_pdf(self, request, pk=None):
+        """Genera un recibo de pago en formato PDF (ReportLab)"""
+        contrato = self.get_object()
+        serializer = ReciboSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        buffer = generar_recibo_inquilino_pdf(contrato, data)
+
+        nombre_limpio = contrato.inquilinoNombre.replace(' ', '_').replace('/', '_').replace('\\', '_')
+        filename = f"recibo_{nombre_limpio}_{data['mes']}_{data['anio']}.pdf"
+        response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        logger.info('Recibo PDF generado para contrato %s - %s %s', pk, data['mes'], data['anio'])
+        return response
+
+    # ── POST /contratos/{id}/recibo-propietario-pdf/ ──────────────────────────
+    @action(detail=True, methods=['post'], url_path='recibo-propietario-pdf')
+    def generar_recibo_propietario_pdf_view(self, request, pk=None):
+        """Genera un recibo de honorarios para el propietario en formato PDF (ReportLab)"""
+        contrato = self.get_object()
+        serializer = ReciboSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        buffer = generar_recibo_propietario_pdf(contrato, data)
+
+        filename = f"recibo_propietario_{data['mes']}_{data['anio']}.pdf"
+        response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        logger.info('Recibo propietario PDF generado para contrato %s - %s %s', pk, data['mes'], data['anio'])
         return response
 
     @action(detail=True, methods=['get'], url_path='documento-garante/(?P<indice>[0-9]+)')

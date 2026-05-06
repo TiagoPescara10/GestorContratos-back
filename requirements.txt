@@ -12,6 +12,7 @@ gunicorn>=21.2
 dj-database-url>=2.0
 apscheduler>=3.10
 python-docx>=0.8.11
+reportlab>=4.0
 num2words>=0.5.12
 cloudinary>=1.44
 django-cloudinary-storage>=0.3.0
