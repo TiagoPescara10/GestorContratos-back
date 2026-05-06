@@ -487,8 +487,6 @@ class ContratoViewSet(viewsets.ModelViewSet):
         doc.add_paragraph()
 
         linea(f"-ALQUILER {data['mes'].upper()} {data['anio']}", f"$ {formatear_monto(monto_alquiler)}.")
-        linea("-EMOS", "Abona locataria.")
-        linea("-MUNICIPAL", "Abona locataria.")
         if conceptos:
             for item in conceptos:
                 nombre = str(item.get('nombre', item.get('concepto', 'EXTRA'))).upper()
