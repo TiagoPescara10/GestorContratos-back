@@ -67,7 +67,9 @@ def _formatear_monto(monto):
 
 def _build_header(story, styles):
     if os.path.exists(LOGO_PATH):
-        logo = Image(LOGO_PATH, width=4 * inch, height=None)
+        LOGO_W = 3.5 * inch
+        LOGO_RATIO = 316 / 711
+        logo = Image(LOGO_PATH, width=LOGO_W, height=LOGO_W * LOGO_RATIO)
         logo.hAlign = "LEFT"
         story.append(logo)
         story.append(Spacer(1, 0.2 * cm))
@@ -185,8 +187,6 @@ def generar_recibo_inquilino_pdf(contrato, data):
 
     filas = [
         {"label": f"-ALQUILER {mes_nombre} {anio}", "valor": f"{_formatear_monto(monto_alquiler)}."},
-        {"label": "-EMOS", "valor": "Abona locataria."},
-        {"label": "-MUNICIPAL", "valor": "Abona locataria."},
     ]
 
     if conceptos:
@@ -244,8 +244,6 @@ def generar_recibo_propietario_pdf(contrato, data):
 
     filas = [
         {"label": f"-ALQUILER {mes_nombre} {anio}", "valor": f"{_formatear_monto(monto_alquiler)}."},
-        {"label": "-EMOS", "valor": "Abona locataria."},
-        {"label": "-MUNICIPAL", "valor": "Abona locataria."},
         {"label": "SUBTOTAL", "valor": f"{_formatear_monto(subtotal)}.", "separador_arriba": True, "negrita": True},
         {"label": f"-GTOS ADMINIST. {honorarios_pct}%", "valor": f"{_formatear_monto(monto_honorarios)}."},
         {"label": "TOTAL", "valor": f"{_formatear_monto(total_propietario)}.", "negrita": True, "separador_arriba": True},
