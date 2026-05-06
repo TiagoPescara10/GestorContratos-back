@@ -609,8 +609,6 @@ class ContratoViewSet(viewsets.ModelViewSet):
         doc.add_paragraph()
 
         linea(f"-ALQUILER {data['mes'].upper()} {data['anio']}", f"$ {formatear_monto(monto_alquiler)}.")
-        linea("-EMOS", "Abona locataria.")
-        linea("-MUNICIPAL", "Abona locataria.")
         linea("SUBTOTAL", f"$ {formatear_monto(subtotal)}.")
         linea(f"-GTOS ADMINIST. {honorarios_pct}%", f"$ {formatear_monto(monto_honorarios)}.")
         linea("TOTAL", f"$ {formatear_monto(total_propietario)}.")
