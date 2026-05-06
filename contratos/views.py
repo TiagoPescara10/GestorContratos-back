@@ -80,44 +80,101 @@ class ContratoViewSet(viewsets.ModelViewSet):
         return ContratoDetailSerializer
 
     def _procesar_archivos_garantes(self, contrato, request):
-        from django.core.files.storage import default_storage
-        from django.core.files.base import ContentFile
-
-        print('[DEBUG] request.FILES keys:', list(request.FILES.keys()))
+        import cloudinary.uploader
 
         garantes = list(contrato.garantes or [])
         actualizado = False
 
         for i, garante in enumerate(garantes):
-            archivo = request.FILES.get(f'garanteDocumentoArchivo_{i}')
-            if archivo:
-                import cloudinary.uploader
+            # Migrar campo viejo documentoArchivo → documentos[0]
+            if garante.get('documentoArchivo') and not garante.get('documentos'):
+                garante['documentos'] = [garante['documentoArchivo']]
+
+            documentos_existentes = list(garante.get('documentos') or [])
+
+            nuevos = []
+            for j in range(10):
+                archivo = request.FILES.get(f'garanteDocumento_{i}_{j}')
+                if not archivo:
+                    continue
                 extension = os.path.splitext(archivo.name)[1].lower().replace('.', '')
-                nombre_sin_ext = os.path.splitext(archivo.name)[0]
-                nombre_limpio = re.sub(r'[^a-zA-Z0-9_-]', '_', nombre_sin_ext)
+                nombre_limpio = re.sub(r'[^a-zA-Z0-9_-]', '_', os.path.splitext(archivo.name)[0])
                 archivo.seek(0)
+                es_imagen = extension in ('jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp')
                 result = cloudinary.uploader.upload(
                     archivo.read(),
                     folder="garantes",
-                    public_id=f"{contrato.pk}_{i}_{nombre_limpio}",
+                    public_id=f"{contrato.pk}_{i}_{j}_{nombre_limpio}",
                     format=extension,
-                    resource_type="raw",
+                    resource_type="image" if es_imagen else "raw",
                     access_mode="public",
                     type="upload"
                 )
+                nuevos.append(result['secure_url'])
 
-                print("Cloudinary result:", result)
-                print("URL guardada:", result['secure_url'])
-                garante['documentoArchivo'] = result['secure_url']
+            if nuevos:
+                garante['documentos'] = (documentos_existentes + nuevos)[:10]
                 actualizado = True
-                print(f'[DEBUG] garante {i} archivo guardado en: {garante["documentoArchivo"]}')
-            elif garante.get('documentoArchivo') is None:
-                # Preservar URL existente si ya tenía archivo (caso edición)
-                pass
+
+            garante.pop('documentoArchivo', None)
 
         if actualizado:
             contrato.garantes = garantes
             contrato.save(update_fields=['garantes'])
+
+    def _procesar_contrato_imagenes(self, contrato, request):
+        import cloudinary.uploader
+
+        nuevas = []
+        for j in range(20):
+            archivo = request.FILES.get(f'contratoImagen_{j}')
+            if not archivo:
+                break
+            extension = os.path.splitext(archivo.name)[1].lower().replace('.', '')
+            nombre_limpio = re.sub(r'[^a-zA-Z0-9_-]', '_', os.path.splitext(archivo.name)[0])
+            archivo.seek(0)
+            result = cloudinary.uploader.upload(
+                archivo.read(),
+                folder="contratos/imagenes",
+                public_id=f"{contrato.pk}_{j}_{nombre_limpio}",
+                format=extension,
+                resource_type="image",
+                access_mode="public",
+                type="upload"
+            )
+            nuevas.append(result['secure_url'])
+
+        if nuevas:
+            existentes = list(contrato.contratoImagenes or [])
+            contrato.contratoImagenes = existentes + nuevas
+            contrato.save(update_fields=['contratoImagenes'])
+
+    def _procesar_contrato_anexos(self, contrato, request):
+        import cloudinary.uploader
+
+        nuevos = []
+        for j in range(10):
+            archivo = request.FILES.get(f'contratoAnexo_{j}')
+            if not archivo:
+                break
+            extension = os.path.splitext(archivo.name)[1].lower().replace('.', '')
+            nombre_limpio = re.sub(r'[^a-zA-Z0-9_-]', '_', os.path.splitext(archivo.name)[0])
+            archivo.seek(0)
+            result = cloudinary.uploader.upload(
+                archivo.read(),
+                folder="contratos/anexos",
+                public_id=f"{contrato.pk}_{j}_{nombre_limpio}",
+                format=extension,
+                resource_type="raw",
+                access_mode="public",
+                type="upload"
+            )
+            nuevos.append(result['secure_url'])
+
+        if nuevos:
+            existentes = list(contrato.contratoAnexos or [])
+            contrato.contratoAnexos = existentes + nuevos
+            contrato.save(update_fields=['contratoAnexos'])
 
     def _procesar_contrato_pdf(self, contrato, request):
         """Procesar archivo PDF del contrato con Cloudinary API directa"""
@@ -176,6 +233,8 @@ class ContratoViewSet(viewsets.ModelViewSet):
             self._procesar_archivos_garantes(contrato, self.request)
             self._procesar_contrato_pdf(contrato, self.request)
             self._procesar_contrato_imagen(contrato, self.request)
+            self._procesar_contrato_imagenes(contrato, self.request)
+            self._procesar_contrato_anexos(contrato, self.request)
             creados = services.generar_meses(contrato)
             logger.info('Contrato %s creado con %d meses', contrato.pk, len(creados))
         except Exception as e:
@@ -187,6 +246,8 @@ class ContratoViewSet(viewsets.ModelViewSet):
         self._procesar_archivos_garantes(contrato, self.request)
         self._procesar_contrato_pdf(contrato, self.request)
         self._procesar_contrato_imagen(contrato, self.request)
+        self._procesar_contrato_imagenes(contrato, self.request)
+        self._procesar_contrato_anexos(contrato, self.request)
         services.generar_meses(contrato, sobreescribir=False)
 
     def destroy(self, request, *args, **kwargs):
@@ -542,7 +603,9 @@ class ContratoViewSet(viewsets.ModelViewSet):
         monto_alquiler   = Decimal(str(data['montoAlquiler']))
         honorarios_pct   = Decimal(str(contrato.honorarios or 0))
         monto_honorarios = (monto_alquiler * honorarios_pct / 100).quantize(Decimal('0.01'))
-        subtotal         = monto_alquiler.quantize(Decimal('0.01'))
+        conceptos_calc   = list(contrato.conceptosExtras or []) or data.get('conceptosExtras') or []
+        total_extras_prop = sum(Decimal(str(c.get('precio', c.get('valor', 0)))) for c in conceptos_calc)
+        subtotal         = (monto_alquiler + total_extras_prop).quantize(Decimal('0.01'))
         total_propietario = (subtotal - monto_honorarios).quantize(Decimal('0.01'))
 
         doc = Document()
@@ -609,7 +672,20 @@ class ContratoViewSet(viewsets.ModelViewSet):
         doc.add_paragraph(texto_principal)
         doc.add_paragraph()
 
+        conceptos_prop = list(contrato.conceptosExtras or []) or data.get('conceptosExtras') or []
+        extras_normales = [c for c in conceptos_prop if str(c.get('nombre', '')).lower() not in ('emos', 'municipal')]
+        item_emos      = next((c for c in conceptos_prop if str(c.get('nombre', '')).lower() == 'emos'), None)
+        item_municipal = next((c for c in conceptos_prop if str(c.get('nombre', '')).lower() == 'municipal'), None)
+
         linea(f"-ALQUILER {data['mes'].upper()} {data['anio']}", f"$ {formatear_monto(monto_alquiler)}.")
+        if extras_normales and (item_emos or item_municipal):
+            linea("-EXPENSAS", "Paga Inquilino.")
+        if item_emos:
+            valor_emos = Decimal(str(item_emos.get('precio', item_emos.get('valor', 0))))
+            linea("-EMOS", f"$ {formatear_monto(valor_emos)}." if valor_emos > 0 else "Abona la locataria.")
+        if item_municipal:
+            valor_mun = Decimal(str(item_municipal.get('precio', item_municipal.get('valor', 0))))
+            linea("-MUNICIPAL", f"$ {formatear_monto(valor_mun)}." if valor_mun > 0 else "Abona la locataria.")
         linea("SUBTOTAL", f"$ {formatear_monto(subtotal)}.")
         linea(f"-GTOS ADMINIST. {honorarios_pct}%", f"$ {formatear_monto(monto_honorarios)}.")
         linea("TOTAL", f"$ {formatear_monto(total_propietario)}.")

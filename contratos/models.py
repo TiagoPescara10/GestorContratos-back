@@ -117,6 +117,8 @@ class Contrato(models.Model):
     valorConceptosExtras  = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     contratoPdf           = models.FileField(upload_to='contratos/pdf/', max_length=500, null=True, blank=True)
     contratoImagen        = models.URLField(max_length=500, null=True, blank=True)
+    contratoImagenes      = models.JSONField(default=list, blank=True)
+    contratoAnexos        = models.JSONField(default=list, blank=True)
 
     # Soft delete
     eliminado   = models.BooleanField(default=False)

@@ -228,7 +228,9 @@ def generar_recibo_propietario_pdf(contrato, data):
     monto_alquiler = Decimal(str(data['montoAlquiler']))
     honorarios_pct = Decimal(str(contrato.honorarios or 0))
     monto_honorarios = (monto_alquiler * honorarios_pct / 100).quantize(Decimal('0.01'))
-    subtotal = monto_alquiler.quantize(Decimal('0.01'))
+    conceptos_calc = list(contrato.conceptosExtras or []) or data.get('conceptosExtras') or []
+    total_extras_prop = sum(Decimal(str(c.get('precio', c.get('valor', 0)))) for c in conceptos_calc)
+    subtotal = (monto_alquiler + total_extras_prop).quantize(Decimal('0.01'))
     total_propietario = (subtotal - monto_honorarios).quantize(Decimal('0.01'))
 
     mes_nombre = data['mes'].upper()
@@ -242,8 +244,23 @@ def generar_recibo_propietario_pdf(contrato, data):
     _build_header(story, styles)
     _build_intro(story, styles, contrato, monto_alquiler, mes_nombre, anio)
 
+    conceptos_prop = list(contrato.conceptosExtras or []) or data.get('conceptosExtras') or []
+    extras_normales = [c for c in conceptos_prop if str(c.get('nombre', '')).lower() not in ('emos', 'municipal')]
+    item_emos      = next((c for c in conceptos_prop if str(c.get('nombre', '')).lower() == 'emos'), None)
+    item_municipal = next((c for c in conceptos_prop if str(c.get('nombre', '')).lower() == 'municipal'), None)
+
     filas = [
         {"label": f"-ALQUILER {mes_nombre} {anio}", "valor": f"{_formatear_monto(monto_alquiler)}."},
+    ]
+    if extras_normales and (item_emos or item_municipal):
+        filas.append({"label": "-EXPENSAS", "valor": "Paga Inquilino."})
+    if item_emos:
+        valor_emos = Decimal(str(item_emos.get('precio', item_emos.get('valor', 0))))
+        filas.append({"label": "-EMOS", "valor": f"{_formatear_monto(valor_emos)}." if valor_emos > 0 else "Abona la locataria."})
+    if item_municipal:
+        valor_mun = Decimal(str(item_municipal.get('precio', item_municipal.get('valor', 0))))
+        filas.append({"label": "-MUNICIPAL", "valor": f"{_formatear_monto(valor_mun)}." if valor_mun > 0 else "Abona la locataria."})
+    filas += [
         {"label": "SUBTOTAL", "valor": f"{_formatear_monto(subtotal)}.", "separador_arriba": True, "negrita": True},
         {"label": f"-GTOS ADMINIST. {honorarios_pct}%", "valor": f"{_formatear_monto(monto_honorarios)}."},
         {"label": "TOTAL", "valor": f"{_formatear_monto(total_propietario)}.", "negrita": True, "separador_arriba": True},
