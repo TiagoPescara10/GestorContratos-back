@@ -12,6 +12,7 @@ from core.views import health_check, check_cloudinary_config, cargar_indices, fo
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health-check'),
+    path('api/health/', health_check, name='api-health-check'),
     path('check-cloudinary/', check_cloudinary_config, name='check-cloudinary'),
     path('cargar-indices/', cargar_indices, name='cargar-indices'),
     path('forzar-migraciones/', forzar_migraciones, name='forzar-migraciones'),

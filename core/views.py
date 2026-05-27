@@ -8,10 +8,20 @@ from django.views.decorators.csrf import csrf_exempt
 from contratos.models import Contrato
 
 def health_check(request):
-    """
-    Health check endpoint to keep Render server awake
-    """
-    return JsonResponse({'status': 'ok'})
+    from django.db import connection
+    from datetime import datetime, timezone
+
+    db_status = "ok"
+    try:
+        connection.ensure_connection()
+    except Exception:
+        db_status = "error"
+
+    return JsonResponse({
+        "status": "ok" if db_status == "ok" else "degraded",
+        "db": db_status,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
 
 def check_cloudinary_config(request):
     """
