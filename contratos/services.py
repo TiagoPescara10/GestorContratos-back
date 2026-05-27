@@ -158,12 +158,24 @@ def aplicar_aumento(
             filtro_futuro
         ).order_by('anio', 'mes')
 
-    resultados = []
-    for em in qs:
-        # Permitir aumentos acumulativos en meses futuros.
-        # Solo evitamos duplicar el mismo registro exacto de aumento.
+    # Materializa el queryset una sola vez
+    meses_list = list(qs)
+
+    # Una query para todos los meses en lugar de N exists() individuales
+    aumentos_existentes = set(
+        AumentoMensual.objects.filter(
+            estadoMensual__in=meses_list,
+            tipoAumento=tipo_aumento,
+        ).values_list('estadoMensual_id', flat=True)
+    )
+
+    nuevos_aumentos   = []
+    meses_a_actualizar = []
+    resultados        = []
+    ahora             = timezone.now()
+
+    for em in meses_list:
         monto_anterior = em.montoFinal
-        monto_nuevo = None
 
         if tipo_aumento == 'monto_fijo':
             if monto_fijo is None:
@@ -182,19 +194,7 @@ def aplicar_aumento(
             monto_nuevo = calcular_nuevo_monto(monto_anterior, porcentaje)
             porcentaje_aplicado = porcentaje
 
-        # Permitir aplicar el mismo aumento varias veces sobre el monto actualizado.
-        # Solo evitamos duplicados exactos por tipo de aumento en el mismo mes, mismo porcentaje y mismo índice (opcional).
-        if AumentoMensual.objects.filter(
-            estadoMensual=em,
-            tipoAumento=tipo_aumento,
-            porcentajeAumento=porcentaje_aplicado,
-            indiceAnterior=indice_anterior,
-            indiceNuevo=indice_nuevo,
-        ).exists():
-            # Si quieres permitir aumentos incluso con el mismo porcentaje/índice, comenta este bloque.
-            pass  # No hacemos continue, permitimos aumentos acumulativos
-
-        AumentoMensual.objects.create(
+        nuevos_aumentos.append(AumentoMensual(
             estadoMensual     = em,
             tipoAumento       = tipo_aumento,
             indiceAnterior    = indice_anterior,
@@ -204,11 +204,12 @@ def aplicar_aumento(
             montoNuevo        = monto_nuevo,
             razon             = razon or f'Aumento {tipo_aumento} {porcentaje_aplicado}%',
             aplicadoPor       = aplicado_por,
-        )
+        ))
 
-        em.montoFinal = monto_nuevo
+        em.montoFinal       = monto_nuevo
         em.aumento_aplicado = True
-        em.save(update_fields=['montoFinal', 'aumento_aplicado', 'updatedAt'])
+        em.updatedAt        = ahora
+        meses_a_actualizar.append(em)
 
         resultados.append({
             'mes':                em.mes,
@@ -217,6 +218,11 @@ def aplicar_aumento(
             'montoNuevo':         str(monto_nuevo),
             'porcentajeAplicado': str(porcentaje_aplicado),
         })
+
+    AumentoMensual.objects.bulk_create(nuevos_aumentos)
+    EstadoMensual.objects.bulk_update(
+        meses_a_actualizar, ['montoFinal', 'aumento_aplicado', 'updatedAt']
+    )
 
     logger.info(
         'Contrato %s: aumento %s aplicado a %d meses',

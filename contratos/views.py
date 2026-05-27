@@ -9,7 +9,7 @@ import requests as req
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes, parser_classes
 from rest_framework.response import Response
 from django.core.files.base import ContentFile
 from rest_framework.permissions import IsAuthenticated
@@ -17,6 +17,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 import cloudinary
 from cloudinary.utils import cloudinary_url
 
+from django.core.cache import cache
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.http import HttpResponse
@@ -27,12 +28,12 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 
 from utils.numero_a_letras import convertir_monto_a_letras
 
-from .models import Contrato, EstadoMensual
+from .models import Contrato, EstadoMensual, PortalInquilino
 from .serializers import (
     ContratoListSerializer, ContratoDetailSerializer,
     EstadoMensualSerializer, EstadoMensualUpdateSerializer,
     AplicarAumentoSerializer, ConfirmarAumentoSerializer, AplicarMoraSerializer,
-    ReciboSerializer,
+    ReciboSerializer, PortalInquilinoSerializer,
 )
 from .filters import ContratoFilter
 from . import services
@@ -71,8 +72,15 @@ class ContratoViewSet(viewsets.ModelViewSet):
             raise AuthenticationFailed('Usuario no autenticado')
             
         if self.request.user.is_superuser:
-            return Contrato.objects.filter(eliminado=False)
-        return Contrato.objects.filter(usuario=self.request.user, eliminado=False)
+            return (Contrato.objects
+                    .filter(eliminado=False)
+                    .select_related('usuario')
+                    .prefetch_related('meses', 'meses__aumentos'))
+        return (Contrato.objects
+                .filter(usuario=self.request.user, eliminado=False)
+                .select_related('usuario')
+                .prefetch_related('meses', 'meses__aumentos')
+                .order_by('-createdAt'))
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -236,6 +244,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
             self._procesar_contrato_imagenes(contrato, self.request)
             self._procesar_contrato_anexos(contrato, self.request)
             creados = services.generar_meses(contrato)
+            cache.delete('estadisticas_globales')
             logger.info('Contrato %s creado con %d meses', contrato.pk, len(creados))
         except Exception as e:
             logger.error('ERROR al crear contrato: %s', str(e), exc_info=True)
@@ -249,6 +258,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
         self._procesar_contrato_imagenes(contrato, self.request)
         self._procesar_contrato_anexos(contrato, self.request)
         services.generar_meses(contrato, sobreescribir=False)
+        cache.delete('estadisticas_globales')
 
     def destroy(self, request, *args, **kwargs):
         """Soft delete — no borra físicamente el registro."""
@@ -256,6 +266,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
         contrato.eliminado   = True
         contrato.eliminadoEn = timezone.now()
         contrato.save(update_fields=['eliminado', 'eliminadoEn'])
+        cache.delete('estadisticas_globales')
         logger.info('Contrato %s marcado como eliminado', contrato.pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -383,6 +394,7 @@ class ContratoViewSet(viewsets.ModelViewSet):
             razon           = data.get('razon', ''),
             aplicado_por    = data.get('aplicadoPor', ''),
         )
+        cache.delete('estadisticas_globales')
         return Response({
             'message':    f'Aumento aplicado a {len(resultados)} meses.',
             'resultados': resultados,
@@ -441,15 +453,21 @@ class ContratoViewSet(viewsets.ModelViewSet):
     # ── POST /contratos/{id}/recalcular-montos/ ────────────────────────────────
     @action(detail=True, methods=['post'], url_path='recalcular-montos')
     def recalcular_montos(self, request, pk=None):
-        contrato = self.get_object()
-
+        contrato    = self.get_object()
         nuevo_valor = Decimal(str(contrato.valorMensual))
+        ahora       = timezone.now()
 
-        actualizados = 0
-        for mes in contrato.meses.order_by('anio', 'mes'):
+        # Una sola query con todos los aumentos prefetcheados
+        meses = list(
+            contrato.meses.prefetch_related('aumentos').order_by('anio', 'mes')
+        )
+
+        for mes in meses:
             porcentaje_acumulado = Decimal('1')
-            for aumento in mes.aumentos.exclude(tipoAumento='mora'):
-                porcentaje_acumulado *= (1 + aumento.porcentajeAumento / 100)
+            # .all() usa el prefetch — no genera query por mes
+            for aumento in mes.aumentos.all():
+                if aumento.tipoAumento != 'mora':
+                    porcentaje_acumulado *= (1 + aumento.porcentajeAumento / 100)
 
             monto_sin_mora = (nuevo_valor * porcentaje_acumulado).quantize(Decimal('0.01'))
             mes.montoBase  = nuevo_valor
@@ -458,11 +476,13 @@ class ContratoViewSet(viewsets.ModelViewSet):
                 if mes.mora_aplicada and mes.recargo_mora
                 else monto_sin_mora
             )
-            mes.save(update_fields=['montoBase', 'montoFinal', 'updatedAt'])
-            actualizados += 1
+            mes.updatedAt = ahora
 
-        logger.info('Contrato %s — %d meses recalculados con base %s', pk, actualizados, nuevo_valor)
-        return Response({'ok': True, 'meses_actualizados': actualizados})
+        # Un solo UPDATE en lugar de N saves individuales
+        EstadoMensual.objects.bulk_update(meses, ['montoBase', 'montoFinal', 'updatedAt'])
+
+        logger.info('Contrato %s — %d meses recalculados con base %s', pk, len(meses), nuevo_valor)
+        return Response({'ok': True, 'meses_actualizados': len(meses)})
 
     # ── POST /contratos/{id}/recibo/ ───────────────────────────────────────────
     @action(detail=True, methods=['post'], url_path='recibo')
@@ -745,6 +765,48 @@ class ContratoViewSet(viewsets.ModelViewSet):
         logger.info('Recibo propietario PDF generado para contrato %s - %s %s', pk, data['mes'], data['anio'])
         return response
 
+    # ── Portal Inquilino ───────────────────────────────────────────────────────
+
+    @action(detail=True, methods=['post'], url_path='portal/activar')
+    def portal_activar(self, request, pk=None):
+        """Crea o reactiva el portal de acceso para el inquilino de este contrato."""
+        contrato = self.get_object()
+        portal, created = PortalInquilino.objects.get_or_create(contrato=contrato)
+        if not created and not portal.activo:
+            portal.activo = True
+            portal.save(update_fields=['activo', 'updatedAt'])
+        serializer = PortalInquilinoSerializer(portal, context={'request': request})
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['delete'], url_path='portal/desactivar')
+    def portal_desactivar(self, request, pk=None):
+        """Desactiva el portal del inquilino. El token se conserva."""
+        contrato = self.get_object()
+        portal = PortalInquilino.objects.filter(contrato=contrato).first()
+        if portal is None:
+            return Response(
+                {'error': 'Este contrato no tiene portal.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        portal.activo = False
+        portal.save(update_fields=['activo', 'updatedAt'])
+        return Response({'ok': True, 'activo': False})
+
+    @action(detail=True, methods=['get'], url_path='portal')
+    def portal_info(self, request, pk=None):
+        """Devuelve el estado del portal del inquilino para este contrato."""
+        contrato = self.get_object()
+        portal = PortalInquilino.objects.filter(contrato=contrato).first()
+        if portal is None:
+            return Response({'activo': False, 'portal': None})
+        serializer = PortalInquilinoSerializer(portal, context={'request': request})
+        return Response(serializer.data)
+
+    # ── Documento garante ──────────────────────────────────────────────────────
+
     @action(detail=True, methods=['get'], url_path='documento-garante/(?P<indice>[0-9]+)')
     def documento_garante(self, request, pk=None, indice=None):
         contrato = self.get_object()
@@ -764,3 +826,146 @@ class ContratoViewSet(viewsets.ModelViewSet):
         response = HttpResponse(r.content, content_type=content_type)
         response['Content-Disposition'] = 'inline; filename="documento"'
         return response
+
+
+import anthropic
+import base64
+import json
+
+PROMPT_EXTRACCION = """Sos un asistente especializado en extraer datos de contratos de alquiler argentinos.
+Analizá el contrato adjunto y extraé TODOS los campos posibles.
+
+Devolvé ÚNICAMENTE un JSON válido con esta estructura exacta, sin texto adicional, sin markdown, sin bloques de código:
+
+{
+  "datos": {
+    "pais": "",
+    "provincia": "",
+    "localidad": "",
+    "codigoPostal": "",
+    "tipoPropiedad": "",
+    "direccion": "",
+    "piso": "",
+    "departamento": "",
+    "inquilinoNombre": "",
+    "inquilinoDni": "",
+    "inquilinoTelefono": "",
+    "inquilinoEmail": "",
+    "propietarioNombre": "",
+    "propietarioDni": "",
+    "propietarioTelefono": "",
+    "propietarioCbu": "",
+    "propietarioEmail": "",
+    "propietarioAlias": "",
+    "propietarioCuit": "",
+    "propietarioCondicionFiscal": "",
+    "propietarioNecesitaFactura": "no",
+    "honorarios": "",
+    "garantes": [
+      {
+        "nombre": "",
+        "dni": "",
+        "telefono": "",
+        "documentoTipo": "",
+        "documentos": []
+      }
+    ],
+    "valorMensual": "",
+    "monedaMensual": "ARS",
+    "valorDeposito": "",
+    "monedaDeposito": "ARS",
+    "fechaInicio": "",
+    "fechaFin": "",
+    "diaPago": "",
+    "duracion": "",
+    "frecuenciaAumento": "",
+    "tipoAumento": "",
+    "tipoInteresMora": "",
+    "valorInteresMora": "",
+    "conceptosExtras": [],
+    "iva": false
+  },
+  "advertencias": [
+    {
+      "campo": "nombre_del_campo",
+      "mensaje": "descripción del problema o duda"
+    }
+  ],
+  "confianza": "alta|media|baja"
+}
+
+Reglas:
+- fechaInicio y fechaFin en formato YYYY-MM-DD
+- valorMensual y valorDeposito como número sin puntos ni comas (ej: 150000)
+- diaPago como número (ej: 10)
+- duracion en meses como número (ej: 24)
+- honorarios como porcentaje número (ej: 10)
+- tipoAumento: uno de IPC, ICL, casa_propia, porcentaje_fijo, monto_fijo
+- frecuenciaAumento: mensual, trimestral, cuatrimestral, semestral o anual
+- Si un campo no está en el contrato, dejalo vacío ("") no null
+- conceptosExtras es array de objetos {nombre, precio} donde precio es número o 0
+- En advertencias incluí campos ilegibles, ambiguos, faltantes importantes, o valores que parecen incorrectos
+- confianza refleja qué tan bien pudiste leer el documento en general
+- conceptosExtras: usá EXACTAMENTE estos nombres disponibles: "Luz", "Gas", "Agua", "Cochera", "Expensas", "Cloacas". Si el contrato menciona "agua y cloacas" son DOS conceptos separados: {"nombre": "Agua", "precio": 0} y {"nombre": "Cloacas", "precio": 0}. NO uses nombres distintos a los de la lista.
+- tipoPropiedad: usá solo uno de estos valores exactos según lo que figure en el contrato: "Casa", "Departamento", "Local", "Oficina", "Galpon", "Terreno", "Otro"
+- tipoAumento: solo puede ser uno de: IPC, ICL, casa_propia, porcentaje_fijo, monto_fijo. Si no está claro dejalo vacío.
+- frecuenciaAumento: solo puede ser uno de: mensual, trimestral, cuatrimestral, semestral, anual. Si no está claro dejalo vacío.
+- tipoInteresMora: solo puede ser uno de: porcentaje_diario, porcentaje_mensual. Si no está claro dejalo vacío.
+- monedaMensual y monedaDeposito: solo "ARS" o "USD"
+- propietarioCondicionFiscal: solo "Responsable Inscripto", "Monotributista" o "Consumidor Final". Si no está claro dejalo vacío.
+- NO inventes valores que no estén en el contrato. Si algo no figura, dejá el campo vacío."""
+
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser])
+@permission_classes([IsAuthenticated])
+def analizar_contrato_pdf(request):
+    archivo = request.FILES.get('pdf')
+    if not archivo:
+        return Response({'error': 'No se recibió ningún archivo PDF.'}, status=400)
+
+    if archivo.content_type != 'application/pdf':
+        return Response({'error': 'El archivo debe ser un PDF.'}, status=400)
+
+    try:
+        pdf_bytes = archivo.read()
+        pdf_base64 = base64.standard_b64encode(pdf_bytes).decode('utf-8')
+
+        from decouple import config
+        client = anthropic.Anthropic(api_key=config('ANTHROPIC_API_KEY'))
+
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=4096,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "application/pdf",
+                                "data": pdf_base64,
+                            },
+                        },
+                        {
+                            "type": "text",
+                            "text": PROMPT_EXTRACCION,
+                        },
+                    ],
+                }
+            ],
+        )
+
+        texto = message.content[0].text
+        logger.error(f'Respuesta Claude: {texto}')
+        limpio = texto.replace('```json', '').replace('```', '').strip()
+        resultado = json.loads(limpio)
+        return Response(resultado)
+
+    except json.JSONDecodeError:
+        return Response({'error': 'Claude no devolvió JSON válido.', 'raw': texto}, status=500)
+    except Exception as e:
+        logger.error(f'Error analizando PDF: {e}')
+        return Response({'error': str(e)}, status=500)

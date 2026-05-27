@@ -2,7 +2,7 @@ import logging
 import re
 import subprocess
 import tempfile
-from datetime import datetime
+from datetime import datetime, date
 
 import requests
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -15,6 +15,7 @@ INDEC_URL = (
     "?ids=148.3_INIVELNAL_DICI_M_26&format=json"
 )
 ARGLY_ICL_URL = "https://api.argly.com.ar/api/icl/history"
+ARGLY_IPC_URL = "https://api.argly.com.ar/api/ipc"
 CP_PAGE_URL = "https://www.argentina.gob.ar/obras-publicas/coeficiente-casa-propia"
 
 _MESES_ES = {
@@ -27,49 +28,88 @@ _RE_FILA_CP = re.compile(r'^([a-z]{3})-(\d{2})\s+([\d,]+)', re.IGNORECASE | re.M
 def _cargar_ipc():
     from .models import IndiceIPC
 
+    hoy = date.today()
+    if IndiceIPC.objects.filter(anio=hoy.year, mes=hoy.month).exists():
+        logger.info("[Scheduler] IPC — %d-%02d ya existe, continuando para cubrir huecos.", hoy.year, hoy.month)
+
     logger.info("[Scheduler] Iniciando carga de IPC...")
+
+    # === 1. HISTÓRICO DESDE INDEC (nivel acumulado → variación mensual) ===
     try:
         resp = requests.get(INDEC_URL, timeout=30)
         resp.raise_for_status()
         datos = resp.json().get("data", [])
     except Exception as exc:
         logger.error("[Scheduler] Error consultando INDEC: %s", exc)
-        return
+        datos = []
 
     creados = actualizados = omitidos = 0
-    for punto in datos:
+
+    for i, punto in enumerate(datos):
         if not isinstance(punto, list) or len(punto) < 2:
             continue
-        fecha_str, valor = punto[0], punto[1]
-        if valor is None:
+        fecha_str, nivel = punto[0], punto[1]
+        if nivel is None or i == 0:
+            continue
+        nivel_anterior = datos[i - 1][1]
+        if nivel_anterior is None or nivel_anterior == 0:
             continue
         try:
             fecha = datetime.strptime(fecha_str[:10], "%Y-%m-%d")
         except ValueError:
             continue
-        redondeado = round(float(valor), 2)
+
+        variacion = round((float(nivel) / float(nivel_anterior) - 1) * 100, 2)
+
         obj, created = IndiceIPC.objects.get_or_create(
             anio=fecha.year,
             mes=fecha.month,
-            defaults={"porcentaje": redondeado},
+            defaults={"porcentaje": variacion},
         )
         if created:
             creados += 1
-        elif float(obj.porcentaje) != redondeado:
-            obj.porcentaje = redondeado
+        elif abs(float(obj.porcentaje) - variacion) > 0.01:
+            obj.porcentaje = variacion
             obj.save()
             actualizados += 1
         else:
             omitidos += 1
 
     logger.info(
-        "[Scheduler] IPC — Creados: %d | Actualizados: %d | Ya existían: %d",
+        "[Scheduler] IPC INDEC — Creados: %d | Actualizados: %d | Ya existían: %d",
         creados, actualizados, omitidos,
     )
+
+    # === 2. MES MÁS RECIENTE DESDE ARGLY (variación directa, sin cálculo) ===
+    try:
+        resp_argly = requests.get(ARGLY_IPC_URL, timeout=10)
+        resp_argly.raise_for_status()
+        data_argly = resp_argly.json().get('data', {})
+
+        mes_argly   = data_argly.get('mes')
+        anio_argly  = data_argly.get('anio')
+        valor_argly = data_argly.get('indice_ipc')
+
+        if mes_argly and anio_argly and valor_argly is not None:
+            obj, created = IndiceIPC.objects.get_or_create(
+                anio=anio_argly,
+                mes=mes_argly,
+                defaults={"porcentaje": round(float(valor_argly), 2)},
+            )
+            if created:
+                logger.info("[Scheduler] IPC Argly — agregado %d-%02d: %s%%", anio_argly, mes_argly, valor_argly)
+            else:
+                logger.info("[Scheduler] IPC Argly — %d-%02d ya existía", anio_argly, mes_argly)
+    except Exception as exc:
+        logger.error("[Scheduler] Error consultando Argly IPC: %s", exc)
 
 
 def _cargar_icl():
     from .models import IndiceICL
+
+    hoy = date.today()
+    if IndiceICL.objects.filter(anio=hoy.year, mes=hoy.month).exists():
+        logger.info("[Scheduler] ICL — %d-%02d ya existe, continuando para cubrir huecos.", hoy.year, hoy.month)
 
     logger.info("[Scheduler] Iniciando carga de ICL...")
     try:
@@ -195,13 +235,13 @@ def iniciar_scheduler():
     scheduler = BackgroundScheduler(timezone="America/Argentina/Buenos_Aires")
     scheduler.add_job(
         _cargar_ipc,
-        trigger=CronTrigger(day='15-30', hour=8, minute=0),
+        trigger=CronTrigger(hour=8, minute=0),
         id="cargar_ipc_mensual",
         replace_existing=True,
     )
     scheduler.add_job(
         _cargar_icl,
-        trigger=CronTrigger(day='15-30', hour=8, minute=15),
+        trigger=CronTrigger(hour=8, minute=15),
         id="cargar_icl_mensual",
         replace_existing=True,
     )
@@ -214,8 +254,8 @@ def iniciar_scheduler():
     scheduler.start()
     logger.info(
         "[Scheduler] Iniciado — "
-        "IPC días 15-30 a las 08:00 | "
-        "ICL días 15-30 a las 08:15 | "
+        "IPC diario a las 08:00 (idempotente) | "
+        "ICL diario a las 08:15 (idempotente) | "
         "Casa Propia días 15-30 a las 08:30 "
         "(hora Argentina)"
     )

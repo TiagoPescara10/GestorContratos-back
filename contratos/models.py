@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
@@ -58,7 +60,7 @@ class Contrato(models.Model):
     piso          = models.CharField(max_length=10, blank=True, null=True, help_text="Número de piso (ej: 4, PB, etc)")
     departamento  = models.CharField(max_length=10, blank=True, null=True, help_text="Departamento (ej: A, B, C, etc)")
     codigoPostal  = models.CharField(max_length=20, blank=True, default='')
-    tipoPropiedad = models.CharField(max_length=20, choices=TipoPropiedad.choices)
+    tipoPropiedad = models.CharField(max_length=20, choices=TipoPropiedad.choices, db_index=True)
 
     # Inquilino
     inquilinoNombre   = models.CharField(max_length=150)
@@ -90,7 +92,7 @@ class Contrato(models.Model):
 
     # Términos financieros
     valorMensual     = models.DecimalField(max_digits=12, decimal_places=2)
-    monedaMensual    = models.CharField(max_length=10, default='ARS')
+    monedaMensual    = models.CharField(max_length=10, default='ARS', db_index=True)
     valorDeposito    = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     monedaDeposito   = models.CharField(max_length=10, blank=True, null=True)
     honorarios       = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
@@ -98,8 +100,8 @@ class Contrato(models.Model):
     valorInteresMora = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     # Temporal
-    fechaInicio = models.DateField()
-    fechaFin    = models.DateField()
+    fechaInicio = models.DateField(db_index=True)
+    fechaFin    = models.DateField(db_index=True)
     diaPago     = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(31)])
     duracion    = models.IntegerField(editable=False, default=0)
 
@@ -121,7 +123,7 @@ class Contrato(models.Model):
     contratoAnexos        = models.JSONField(default=list, blank=True)
 
     # Soft delete
-    eliminado   = models.BooleanField(default=False)
+    eliminado   = models.BooleanField(default=False, db_index=True)
     eliminadoEn = models.DateTimeField(null=True, blank=True)
 
     # Metadatos
@@ -132,6 +134,10 @@ class Contrato(models.Model):
         ordering = ['-createdAt']
         verbose_name = 'Contrato'
         verbose_name_plural = 'Contratos'
+        indexes = [
+            models.Index(fields=['usuario', 'eliminado'], name='contrato_usuario_eliminado_idx'),
+            models.Index(fields=['fechaInicio', 'fechaFin'], name='contrato_fechas_idx'),
+        ]
 
     def __str__(self):
         return f"#{self.pk} {self.inquilinoNombre} — {self.localidad}"
@@ -167,7 +173,7 @@ class EstadoMensual(models.Model):
     contrato         = models.ForeignKey(Contrato, on_delete=models.CASCADE, related_name='meses')
     mes              = models.IntegerField(validators=[MinValueValidator(0), MaxValueValidator(11)])
     anio             = models.IntegerField()
-    estado           = models.CharField(max_length=20, choices=EstadoPago.choices, default=EstadoPago.PENDIENTE)
+    estado           = models.CharField(max_length=20, choices=EstadoPago.choices, default=EstadoPago.PENDIENTE, db_index=True)
     montoBase        = models.DecimalField(max_digits=12, decimal_places=2)
     montoFinal       = models.DecimalField(max_digits=12, decimal_places=2)
     iva              = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
@@ -180,6 +186,11 @@ class EstadoMensual(models.Model):
     recargo_mora     = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     fecha_aplicacion_mora = models.DateTimeField(null=True, blank=True)
 
+
+    comprobante_url      = models.URLField(max_length=500, null=True, blank=True)
+    comprobante_nombre   = models.CharField(max_length=255, null=True, blank=True)
+    comprobante_subidoEn = models.DateTimeField(null=True, blank=True)
+    comprobante_revisado = models.BooleanField(default=False)
 
     createdAt        = models.DateTimeField(auto_now_add=True)
     updatedAt        = models.DateTimeField(auto_now=True)
@@ -219,7 +230,7 @@ class EstadoMensual(models.Model):
 
 class AumentoMensual(models.Model):
     estadoMensual     = models.ForeignKey(EstadoMensual, on_delete=models.CASCADE, related_name='aumentos')
-    tipoAumento       = models.CharField(max_length=20, choices=TipoAumentoHistorico.choices)
+    tipoAumento       = models.CharField(max_length=20, choices=TipoAumentoHistorico.choices, db_index=True)
     indiceAnterior    = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
     indiceNuevo       = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
     porcentajeAumento = models.DecimalField(max_digits=8, decimal_places=4)
@@ -236,3 +247,18 @@ class AumentoMensual(models.Model):
 
     def __str__(self):
         return f"{self.tipoAumento} +{self.porcentajeAumento}% → {self.estadoMensual}"
+
+
+class PortalInquilino(models.Model):
+    contrato  = models.OneToOneField(Contrato, on_delete=models.CASCADE, related_name='portal')
+    token     = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    activo    = models.BooleanField(default=True)
+    createdAt = models.DateTimeField(auto_now_add=True)
+    updatedAt = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Portal Inquilino'
+        verbose_name_plural = 'Portales Inquilinos'
+
+    def __str__(self):
+        return f"Portal #{self.contrato_id} — {'activo' if self.activo else 'inactivo'}"

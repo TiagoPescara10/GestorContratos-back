@@ -16,3 +16,4 @@ reportlab>=4.0
 num2words>=0.5.12
 cloudinary>=1.44
 django-cloudinary-storage>=0.3.0
+anthropic

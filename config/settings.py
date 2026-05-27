@@ -84,17 +84,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database configuration - Forzar PostgreSQL en producción
+# Database configuration
 import dj_database_url
 
-# Usar PostgreSQL en Render (ignorar DEBUG temporalmente)
-if 'onrender.com' in os.environ.get('RENDER_EXTERNAL_HOSTNAME', ''):
-    DATABASE_URL = 'postgresql://gestorpostgre:8H9IYSjy9nebhjWjlunVPgOkzGoxXHvO@dpg-d7g25b1o3t8c73ftkvlg-a/gestor_contratos'
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
     DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL)
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     }
 else:
-    # Development: usar SQLite
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -115,6 +114,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 # MEDIA_URL y MEDIA_ROOT se configuran dinámicamente según Cloudinary
 
 # Custom user model
@@ -255,18 +255,18 @@ import cloudinary
 
 # Configurar Cloudinary directamente
 cloudinary.config(
-    cloud_name='dmnwbg0rj',
-    api_key='657551349873981',
-    api_secret='Vtn6NIsLyhG5ncZdvkwB4aLOXGI',
+    cloud_name=config('CLOUDINARY_CLOUD_NAME'),
+    api_key=config('CLOUDINARY_API_KEY'),
+    api_secret=config('CLOUDINARY_API_SECRET'),
     secure=True,
 )
 
 # Usar Cloudinary como storage por defecto con configuración específica para raw files
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': 'dmnwbg0rj',
-    'API_KEY': '657551349873981',
-    'API_SECRET': 'Vtn6NIsLyhG5ncZdvkwB4aLOXGI',
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': config('CLOUDINARY_API_KEY'),
+    'API_SECRET': config('CLOUDINARY_API_SECRET'),
     'SECURE': True,
     'SIGN_URL': False,
     'RESOURCE_TYPE': 'raw',

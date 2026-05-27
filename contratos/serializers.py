@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import Contrato, EstadoMensual, AumentoMensual
+from .models import Contrato, EstadoMensual, AumentoMensual, PortalInquilino
 
 
 class AumentoMensualSerializer(serializers.ModelSerializer):
@@ -38,19 +38,103 @@ class EstadoMensualUpdateSerializer(serializers.Serializer):
 
 
 class ContratoListSerializer(serializers.ModelSerializer):
-    estado         = serializers.ReadOnlyField()
-    dias_restantes = serializers.ReadOnlyField()
+    estado            = serializers.ReadOnlyField()
+    dias_restantes    = serializers.ReadOnlyField()
     frecuenciaAumento = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    mes_actual        = serializers.SerializerMethodField()
+    mes_proximo       = serializers.SerializerMethodField()
 
     class Meta:
         model = Contrato
         fields = [
             'id', 'usuario', 'inquilinoNombre', 'inquilinoDni',
-            'propietarioNombre', 'localidad', 'provincia','direccion',
+            'propietarioNombre', 'propietarioDni', 'propietarioTelefono',
+            'propietarioEmail', 'propietarioCbu', 'propietarioAlias',
+            'propietarioNombreCompleto', 'propietarioCuit',
+            'localidad', 'provincia', 'direccion',
             'tipoPropiedad', 'valorMensual', 'monedaMensual',
             'fechaInicio', 'fechaFin', 'diaPago', 'duracion',
             'estado', 'dias_restantes', 'frecuenciaAumento', 'createdAt',
+            'tipoAumento', 'conceptosExtras', 'honorarios',
+            'mes_actual', 'mes_proximo',
         ]
+
+    def get_mes_actual(self, obj):
+        hoy = timezone.now().date()
+        mes = hoy.month - 1  # 0-indexed
+        anio = hoy.year
+        try:
+            # Usa el prefetch — no genera nueva query
+            estado_mes = next(
+                (m for m in obj.meses.all() if m.mes == mes and m.anio == anio),
+                None,
+            )
+            if not estado_mes:
+                return None
+            MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+            # .all() sobre aumentos usa el prefetch meses__aumentos — no genera query
+            aumentos = [
+                {
+                    'tipoAumento':      a.tipoAumento,
+                    'porcentajeAumento': a.porcentajeAumento,
+                    'montoAnterior':    a.montoAnterior,
+                    'montoNuevo':       a.montoNuevo,
+                    'razon':            a.razon,
+                }
+                for a in estado_mes.aumentos.all()
+            ]
+            return {
+                'mes':             estado_mes.mes,
+                'anio':            estado_mes.anio,
+                'nombreMes':       MESES[estado_mes.mes],
+                'estado':          estado_mes.estado,
+                'montoBase':       float(estado_mes.montoBase or 0),
+                'montoFinal':      float(estado_mes.montoFinal or estado_mes.montoBase or 0),
+                'recargo_mora':    float(estado_mes.recargo_mora or 0),
+                'dias_atraso':     estado_mes.dias_atraso or 0,
+                'aumento_aplicado': estado_mes.aumento_aplicado,
+                'aumentos':        aumentos,
+            }
+        except Exception:
+            return None
+
+    def get_mes_proximo(self, obj):
+        hoy = timezone.now().date()
+        if hoy.month == 12:
+            mes = 0
+            anio = hoy.year + 1
+        else:
+            mes = hoy.month  # 0-indexed: hoy.month ya es el próximo
+            anio = hoy.year
+        try:
+            meses_prefetch = list(obj.meses.all())  # lista en memoria, sin query extra
+            estado_mes = next(
+                (m for m in meses_prefetch if m.mes == mes and m.anio == anio),
+                None,
+            )
+            if not estado_mes:
+                return None
+
+            if mes == 0:
+                mes_ant, anio_ant = 11, anio - 1
+            else:
+                mes_ant, anio_ant = mes - 1, anio
+            em_anterior = next(
+                (m for m in meses_prefetch if m.mes == mes_ant and m.anio == anio_ant),
+                None,
+            )
+            # .all() usa el prefetch meses__aumentos — no genera query
+            count_actual   = sum(1 for a in estado_mes.aumentos.all() if a.tipoAumento != 'mora')
+            count_anterior = sum(1 for a in em_anterior.aumentos.all() if a.tipoAumento != 'mora') if em_anterior else 0
+
+            return {
+                'mes':             estado_mes.mes,
+                'anio':            estado_mes.anio,
+                'aumento_aplicado': count_actual > count_anterior,
+            }
+        except Exception:
+            return None
 
 
 class ContratoDetailSerializer(serializers.ModelSerializer):
@@ -219,6 +303,101 @@ class AplicarMoraSerializer(serializers.Serializer):
             )
 
         return data
+
+
+# ── Portal Inquilino ─────────────────────────────────────────────────────────
+
+class AumentoPortalSerializer(serializers.ModelSerializer):
+    """Mínimo necesario para mostrar el aumento al inquilino."""
+    class Meta:
+        model = AumentoMensual
+        fields = ['porcentajeAumento', 'montoAnterior', 'montoNuevo', 'tipoAumento', 'aplicadoEn']
+
+
+class EstadoMensualPortalSerializer(serializers.ModelSerializer):
+    """Read-only. Expuesto al inquilino en el portal público."""
+    nombreMes         = serializers.SerializerMethodField()
+    fecha_vencimiento = serializers.SerializerMethodField()
+    aumentos          = AumentoPortalSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = EstadoMensual
+        fields = [
+            'id', 'mes', 'anio', 'nombreMes', 'estado',
+            'montoBase', 'montoFinal', 'fecha_vencimiento',
+            'cargosAdicionales', 'iva', 'honorarios',
+            'mora_aplicada', 'dias_atraso', 'recargo_mora',
+            'aumento_aplicado', 'aumentos',
+            'comprobante_url', 'comprobante_nombre',
+            'comprobante_subidoEn', 'comprobante_revisado',
+        ]
+
+    def get_nombreMes(self, obj):
+        MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+        return MESES[obj.mes]
+
+    def get_fecha_vencimiento(self, obj):
+        return obj.fecha_vencimiento
+
+
+class ContratoPortalSerializer(serializers.ModelSerializer):
+    """Read-only. Datos mínimos del contrato expuestos al inquilino."""
+    meses = EstadoMensualPortalSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Contrato
+        fields = [
+            'id', 'inquilinoNombre', 'inquilinoDni',
+            'direccion', 'localidad', 'provincia', 'piso', 'departamento',
+            'tipoPropiedad', 'fechaInicio', 'fechaFin', 'diaPago',
+            'valorMensual', 'monedaMensual', 'propietarioNombre',
+            'meses',
+        ]
+
+
+class PortalInquilinoSerializer(serializers.ModelSerializer):
+    """Para uso del admin — incluye token y link."""
+    contrato_nombre         = serializers.SerializerMethodField()
+    contrato_direccion      = serializers.SerializerMethodField()
+    contrato_inquilino      = serializers.SerializerMethodField()
+    comprobantes_pendientes = serializers.SerializerMethodField()
+    link                    = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PortalInquilino
+        fields = [
+            'id', 'token', 'activo', 'createdAt', 'updatedAt',
+            'contrato', 'contrato_nombre', 'contrato_direccion', 'contrato_inquilino',
+            'comprobantes_pendientes', 'link',
+        ]
+        read_only_fields = ('token', 'createdAt', 'updatedAt')
+
+    def get_contrato_nombre(self, obj):
+        return obj.contrato.inquilinoNombre
+
+    def get_contrato_direccion(self, obj):
+        return obj.contrato.direccion
+
+    def get_contrato_inquilino(self, obj):
+        return {
+            'nombre':   obj.contrato.inquilinoNombre,
+            'telefono': obj.contrato.inquilinoTelefono,
+            'localidad': obj.contrato.localidad,
+        }
+
+    def get_comprobantes_pendientes(self, obj):
+        return obj.contrato.meses.filter(
+            comprobante_url__isnull=False,
+            comprobante_revisado=False,
+        ).exclude(comprobante_url='').count()
+
+    def get_link(self, obj):
+        request = self.context.get('request')
+        path = f'/inquilino/{obj.token}'
+        if request:
+            return request.build_absolute_uri(path)
+        return path
 
 
 class ReciboSerializer(serializers.Serializer):

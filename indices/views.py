@@ -1,9 +1,12 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, serializers
+from django.core.cache import cache
 
 from .client import obtener_indice
 from .models import HistorialIndice, IndiceIPC, IndiceICL, IndiceCP
+
+CACHE_TTL_INDICES = 24 * 60 * 60  # 24 horas
 
 
 class IndiceIPCSerializer(serializers.ModelSerializer):
@@ -50,17 +53,31 @@ def _guardar_historial(data: dict):
 
 
 class IndiceIPCView(APIView):
-    """GET /api/indices/ipc/ — nivel + variación mensual calculada."""
+    """GET /api/indices/ipc/ — variación mensual directa desde BD."""
     def get(self, request):
-        qs = IndiceIPC.objects.all()  # ordenado por anio, mes via Meta
-        return Response(_calcular_variaciones(qs))
+        data = cache.get('indices_ipc')
+        if data is None:
+            data = [
+                {
+                    'anio':      r.anio,
+                    'mes':       r.mes,
+                    'nivel':     float(r.porcentaje),
+                    'variacion': float(r.porcentaje),
+                }
+                for r in IndiceIPC.objects.all()
+            ]
+            cache.set('indices_ipc', data, CACHE_TTL_INDICES)
+        return Response(data)
 
 
 class IndiceICLHistoricoView(APIView):
     """GET /api/indices/icl-historico/ — nivel + variación mensual desde tabla local."""
     def get(self, request):
-        qs = IndiceICL.objects.all()  # ordenado por anio, mes via Meta
-        return Response(_calcular_variaciones(qs, campo='nivel'))
+        data = cache.get('indices_icl_historico')
+        if data is None:
+            data = _calcular_variaciones(IndiceICL.objects.all(), campo='nivel')
+            cache.set('indices_icl_historico', data, CACHE_TTL_INDICES)
+        return Response(data)
 
 
 class IndiceICLView(APIView):

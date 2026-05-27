@@ -4,8 +4,8 @@ services:
     name: gestor-contratos-api
     runtime: python
     plan: starter
-    buildCommand: "pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py shell < scripts/crear_cliente.py"
-    startCommand: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"
+    buildCommand: "pip install -r requirements.txt && python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py shell < scripts/crear_cliente.py"
+    startCommand: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --worker-class gthread --threads 2 --timeout 120 --keep-alive 5"
     envVars:
       - key: DEBUG
         value: "False"
@@ -13,37 +13,20 @@ services:
         generateValue: true
       - key: ALLOWED_HOSTS
         value: gestor-contratos-backend.onrender.com,onrender.com,*.onrender.com
-      - key: DB_NAME
-        value: gestor_contratos
-      - key: DB_HOST
-        value: dpg-d7g25b1o3t8c73ftkvlg-a
-      - key: DB_PORT
-        value: 5432
-      - key: DB_USER
-        value: gestorpostgre
-      - key: DB_PASSWORD
-        value: 8H9IYSjy9nebhjWjlunVPgOkzGoxXHvO
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gestor-contratos-db
+          property: connectionString
       - key: CORS_ALLOWED_ORIGINS
-        value: https://gestor-contratos.vercel.app,https://gestor-contratos.vercel.app
+        value: https://giordanoconti-gestorcontratos.vercel.app
       - key: CLOUDINARY_CLOUD_NAME
         value: dmnwbg0rj
       - key: CLOUDINARY_API_KEY
         value: 657551349873981
       - key: CLOUDINARY_API_SECRET
         value: Vtn6NIsLyhG5ncZdvkwB4aLOXGI
-
-  # PostgreSQL Database
-  - type: pserv
-    name: gestor-contratos-db
-    runtime: postgresql
-    plan: starter
-    envVars:
-      - key: POSTGRES_DB
-        value: gestor_contratos
-      - key: POSTGRES_USER
-        value: postgres
-      - key: POSTGRES_PASSWORD
-        value: postgres
+      - key: ANTHROPIC_API_KEY
+        value: ""  # Completar con la API key de Anthropic antes del deploy
 
 databases:
   - name: gestor-contratos-db
