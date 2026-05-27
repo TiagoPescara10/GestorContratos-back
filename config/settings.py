@@ -19,12 +19,13 @@ else:
     except ValueError:
         DEBUG = True  # Fallback para desarrollo
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,gestorcontratosia-back.onrender.com').split(',')
 
 # Additional fallback for Render
 if 'onrender.com' in os.environ.get('RENDER_EXTERNAL_HOSTNAME', ''):
     ALLOWED_HOSTS.extend([
         'gestor-contratos-backend.onrender.com',
+        'gestorcontratosia-back.onrender.com',
         'onrender.com',
         '*.onrender.com'
     ])

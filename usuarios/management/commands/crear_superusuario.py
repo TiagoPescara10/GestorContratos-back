@@ -16,8 +16,9 @@ class Command(BaseCommand):
         user, created = User.objects.get_or_create(
             email=email,
             defaults={
-                'nombre': nombre,
-                'apellido': '',
+                'username': email,
+                'first_name': nombre,
+                'last_name': '',
                 'is_staff': True,
                 'is_superuser': True,
             }
