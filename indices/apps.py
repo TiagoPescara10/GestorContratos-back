@@ -9,9 +9,8 @@ class IndicesConfig(AppConfig):
     verbose_name = 'Índices'
 
     def ready(self):
-        # Iniciar scheduler solo si no estamos en Render (usará cron jobs)
-        if 'onrender.com' not in os.environ.get('RENDER_EXTERNAL_HOSTNAME', ''):
-            # Evitar doble arranque con el reloader de desarrollo
-            if os.environ.get('RUN_MAIN') == 'true':
-                from .scheduler import iniciar_scheduler
-                iniciar_scheduler()
+        # RUN_MAIN='true' → proceso hijo del reloader (desarrollo)
+        # RUN_MAIN ausente  → Gunicorn u otro servidor de producción
+        if os.environ.get('RUN_MAIN') == 'true' or not os.environ.get('RUN_MAIN'):
+            from .scheduler import iniciar_scheduler
+            iniciar_scheduler()
