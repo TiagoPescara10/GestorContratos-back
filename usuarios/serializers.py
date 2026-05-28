@@ -1,7 +1,13 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
-from .models import Usuario
+from .models import Usuario, PerfilInmobiliaria
+
+
+class PerfilInmobiliariaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PerfilInmobiliaria
+        fields = ['nombre', 'subtitulo', 'telefono', 'email', 'direccion', 'localidad', 'logo']
 
 
 class UsuarioSerializer(serializers.ModelSerializer):

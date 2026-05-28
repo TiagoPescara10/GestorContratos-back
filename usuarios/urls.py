@@ -2,7 +2,8 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     LoginView, UsuarioCreateView, UsuarioListView,
-    perfil_usuario, actualizar_perfil, crear_usuario_cliente
+    perfil_usuario, actualizar_perfil, crear_usuario_cliente,
+    perfil_inmobiliaria, subir_logo_inmobiliaria,
 )
 
 urlpatterns = [
@@ -13,4 +14,7 @@ urlpatterns = [
     path('usuarios/crear/', UsuarioCreateView.as_view(), name='usuario-create'),
     path('perfil/', perfil_usuario, name='perfil'),
     path('perfil/actualizar/', actualizar_perfil, name='actualizar-perfil'),
+    # Perfil de inmobiliaria (singleton)
+    path('perfil-inmobiliaria/', perfil_inmobiliaria, name='perfil-inmobiliaria'),
+    path('perfil-inmobiliaria/logo/', subir_logo_inmobiliaria, name='perfil-inmobiliaria-logo'),
 ]

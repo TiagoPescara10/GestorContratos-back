@@ -21,7 +21,7 @@ MESES_ES = {
 COLOR_GRIS = HexColor("#444444")
 COLOR_LINEA = HexColor("#aaaaaa")
 
-LOGO_PATH = os.path.join(os.path.dirname(__file__), '..', 'logo-inmobiliaria-recibo.jpg')
+_LOGO_PATH_FALLBACK = os.path.join(os.path.dirname(__file__), '..', 'logo-inmobiliaria-recibo.jpg')
 
 
 def _get_styles():
@@ -66,26 +66,39 @@ def _formatear_monto(monto):
 
 
 def _build_header(story, styles):
-    if os.path.exists(LOGO_PATH):
+    from usuarios.models import PerfilInmobiliaria
+    perfil = PerfilInmobiliaria.get_singleton()
+
+    logo_usado = None
+    if perfil.logo:
+        try:
+            import urllib.request, tempfile
+            tmp = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+            urllib.request.urlretrieve(perfil.logo, tmp.name)
+            tmp.close()
+            logo_usado = tmp.name
+        except Exception:
+            pass
+    if logo_usado is None and os.path.exists(_LOGO_PATH_FALLBACK):
+        logo_usado = _LOGO_PATH_FALLBACK
+
+    if logo_usado:
         LOGO_W = 3.5 * inch
         LOGO_RATIO = 316 / 711
-        logo = Image(LOGO_PATH, width=LOGO_W, height=LOGO_W * LOGO_RATIO)
+        logo = Image(logo_usado, width=LOGO_W, height=LOGO_W * LOGO_RATIO)
         logo.hAlign = "LEFT"
         story.append(logo)
         story.append(Spacer(1, 0.2 * cm))
 
-    story.append(Paragraph(
-        "Martires Riocuartenses N° 1395 – X5800 – Rio Cuarto – Córdoba.",
-        styles["subtitulo"]
-    ))
-    story.append(Paragraph(
-        "9 de Julio Nº 483-x6125-Serrano-Córdoba.",
-        styles["subtitulo"]
-    ))
-    story.append(Paragraph(
-        "Tel: 358 4864404 o 3385 465877 - E-Mail: inmobiliariagiordanoconti@gmail.com",
-        styles["subtitulo"]
-    ))
+    if perfil.direccion:
+        story.append(Paragraph(perfil.direccion, styles["subtitulo"]))
+    contacto_parts = []
+    if perfil.telefono:
+        contacto_parts.append(f"Tel: {perfil.telefono}")
+    if perfil.email:
+        contacto_parts.append(f"E-Mail: {perfil.email}")
+    if contacto_parts:
+        story.append(Paragraph(" - ".join(contacto_parts), styles["subtitulo"]))
     story.append(Spacer(1, 0.4 * cm))
 
 

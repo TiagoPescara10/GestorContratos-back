@@ -504,18 +504,36 @@ class ContratoViewSet(viewsets.ModelViewSet):
         valor_interes  = Decimal(str(data.get('valorInteresMora') or 0))
         total_monto    = (monto_alquiler + total_extras + recargo_mora).quantize(Decimal('0.01'))
 
+        from usuarios.models import PerfilInmobiliaria as _PI
+        _perfil = _PI.get_singleton()
+
         doc = Document()
 
-        import os
-        logo_path = os.path.join(os.path.dirname(__file__), '..', 'logo-inmobiliaria-recibo.jpg')
-        if os.path.exists(logo_path):
-            doc.add_picture(logo_path, width=Inches(4.0))
+        if _perfil.logo:
+            try:
+                import urllib.request, tempfile
+                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as _tmp:
+                    urllib.request.urlretrieve(_perfil.logo, _tmp.name)
+                    doc.add_picture(_tmp.name, width=Inches(4.0))
+            except Exception:
+                pass
+        else:
+            import os
+            logo_path = os.path.join(os.path.dirname(__file__), '..', 'logo-inmobiliaria-recibo.jpg')
+            if os.path.exists(logo_path):
+                doc.add_picture(logo_path, width=Inches(4.0))
 
         header = doc.add_paragraph()
         header.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        header.add_run("Martires Riocuartenses N° 1395 – X5800 – Rio Cuarto – Córdoba.\n")
-        header.add_run("9 de Julio Nº 483-x6125-Serrano-Córdoba.\n")
-        header.add_run("Tel: 358 4864404 o 3385 465877 - E-Mail: inmobiliariagiordanoconti@gmail.com")
+        if _perfil.direccion:
+            header.add_run(f"{_perfil.direccion}\n")
+        _contacto_parts = []
+        if _perfil.telefono:
+            _contacto_parts.append(f"Tel: {_perfil.telefono}")
+        if _perfil.email:
+            _contacto_parts.append(f"E-Mail: {_perfil.email}")
+        if _contacto_parts:
+            header.add_run(" - ".join(_contacto_parts))
 
         doc.add_paragraph()
 
@@ -628,18 +646,36 @@ class ContratoViewSet(viewsets.ModelViewSet):
         subtotal         = (monto_alquiler + total_extras_prop).quantize(Decimal('0.01'))
         total_propietario = (subtotal - monto_honorarios).quantize(Decimal('0.01'))
 
+        from usuarios.models import PerfilInmobiliaria as _PI2
+        _perfil2 = _PI2.get_singleton()
+
         doc = Document()
 
-        import os
-        logo_path = os.path.join(os.path.dirname(__file__), '..', 'logo-inmobiliaria-recibo.jpg')
-        if os.path.exists(logo_path):
-            doc.add_picture(logo_path, width=Inches(4.0))
+        if _perfil2.logo:
+            try:
+                import urllib.request, tempfile
+                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as _tmp2:
+                    urllib.request.urlretrieve(_perfil2.logo, _tmp2.name)
+                    doc.add_picture(_tmp2.name, width=Inches(4.0))
+            except Exception:
+                pass
+        else:
+            import os
+            logo_path = os.path.join(os.path.dirname(__file__), '..', 'logo-inmobiliaria-recibo.jpg')
+            if os.path.exists(logo_path):
+                doc.add_picture(logo_path, width=Inches(4.0))
 
         header = doc.add_paragraph()
         header.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        header.add_run("Martires Riocuartenses N° 1395 – X5800 – Rio Cuarto – Córdoba.\n")
-        header.add_run("9 de Julio Nº 483-x6125-Serrano-Córdoba.\n")
-        header.add_run("Tel: 358 4864404 o 3385 465877 - E-Mail: inmobiliariagiordanoconti@gmail.com")
+        if _perfil2.direccion:
+            header.add_run(f"{_perfil2.direccion}\n")
+        _contacto_parts2 = []
+        if _perfil2.telefono:
+            _contacto_parts2.append(f"Tel: {_perfil2.telefono}")
+        if _perfil2.email:
+            _contacto_parts2.append(f"E-Mail: {_perfil2.email}")
+        if _contacto_parts2:
+            header.add_run(" - ".join(_contacto_parts2))
 
         doc.add_paragraph()
 

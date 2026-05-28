@@ -1,12 +1,13 @@
 from rest_framework import status, generics
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 
-from .models import Usuario
-from .serializers import UsuarioSerializer, LoginSerializer, UsuarioListSerializer
+from .models import Usuario, PerfilInmobiliaria
+from .serializers import UsuarioSerializer, LoginSerializer, UsuarioListSerializer, PerfilInmobiliariaSerializer
 
 User = get_user_model()
 
@@ -116,14 +117,66 @@ def actualizar_perfil(request):
     """
     user = request.user
     data = request.data
-    
+
     # Campos permitidos para auto-actualización
     allowed_fields = ['first_name', 'last_name', 'telefono']
-    
+
     for field in allowed_fields:
         if field in data:
             setattr(user, field, data[field])
-    
+
     user.save()
     serializer = UsuarioListSerializer(user)
     return Response(serializer.data)
+
+
+@api_view(['GET', 'PUT'])
+@permission_classes([AllowAny])
+def perfil_inmobiliaria(request):
+    """
+    GET: devuelve el perfil (público, para el portal del inquilino)
+    PUT: actualiza el perfil (requiere auth)
+    """
+    perfil = PerfilInmobiliaria.get_singleton()
+
+    if request.method == 'GET':
+        serializer = PerfilInmobiliariaSerializer(perfil)
+        return Response(serializer.data)
+
+    # PUT requiere autenticación
+    if not request.user or not request.user.is_authenticated:
+        return Response({'detail': 'Autenticación requerida.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    serializer = PerfilInmobiliariaSerializer(perfil, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def subir_logo_inmobiliaria(request):
+    """
+    Sube el logo a Cloudinary y actualiza la URL en PerfilInmobiliaria.
+    """
+    archivo = request.FILES.get('logo')
+    if not archivo:
+        return Response({'detail': 'No se recibió ningún archivo.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        import cloudinary.uploader
+        result = cloudinary.uploader.upload(
+            archivo,
+            folder='perfil_inmobiliaria',
+            public_id='logo',
+            overwrite=True,
+            resource_type='image',
+        )
+        url = result.get('secure_url', '')
+        perfil = PerfilInmobiliaria.get_singleton()
+        perfil.logo = url
+        perfil.save()
+        return Response({'logo': url})
+    except Exception as e:
+        return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
