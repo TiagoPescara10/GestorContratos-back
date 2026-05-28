@@ -7,6 +7,44 @@ from indices.models import IndiceIPC
 
 ARGLY_IPC_HISTORY_URL = "https://api.argly.com.ar/api/ipc/history"
 
+_CAMPOS_VALOR = ["indice_ipc", "valor", "porcentaje", "variacion", "ipc"]
+_CAMPOS_FECHA = ["fecha", "date", "periodo", "mes_anio"]
+
+
+def _extraer_valor(r: dict):
+    """Retorna el primer campo numérico que exista en el registro (None-safe)."""
+    for campo in _CAMPOS_VALOR:
+        v = r.get(campo)
+        if v is not None:
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def _extraer_fecha(r: dict):
+    """Retorna (anio, mes) probando varios formatos. Retorna None si no puede parsear."""
+    for campo in _CAMPOS_FECHA:
+        fecha_str = r.get(campo)
+        if not fecha_str:
+            continue
+        fecha_str = str(fecha_str).strip()
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%Y", "%Y-%m"):
+            try:
+                dt = datetime.strptime(fecha_str[:len(fmt.replace("%d","00").replace("%m","00").replace("%Y","0000").replace("%",""))], fmt)
+                return dt.year, dt.month
+            except ValueError:
+                continue
+        # Intento genérico por longitud
+        try:
+            if len(fecha_str) >= 10:
+                dt = datetime.strptime(fecha_str[:10], "%Y-%m-%d")
+                return dt.year, dt.month
+        except ValueError:
+            pass
+    return None
+
 
 class Command(BaseCommand):
     help = "Carga todos los registros históricos de IPC desde Argly usando get_or_create."
@@ -17,38 +55,43 @@ class Command(BaseCommand):
         try:
             resp = requests.get(ARGLY_IPC_HISTORY_URL, timeout=30)
             resp.raise_for_status()
-            registros = resp.json().get("data", [])
+            raw_json = resp.json()
         except Exception as exc:
             self.stderr.write(self.style.ERROR(f"Error al consultar Argly: {exc}"))
             return
 
+        registros = raw_json.get("data", [])
+
         if not registros:
             self.stderr.write(self.style.WARNING("La API devolvió 0 registros."))
+            self.stdout.write(f"Respuesta completa: {raw_json}")
             return
 
-        self.stdout.write(f"Registros recibidos desde Argly: {len(registros)}")
+        self.stdout.write(f"Registros recibidos: {len(registros)}")
+        self.stdout.write(f"Primer registro (raw): {registros[0]}")
+        self.stdout.write(f"Campos disponibles:    {list(registros[0].keys())}")
 
         ultimo_por_mes: dict[tuple, float] = {}
+        saltados = 0
         for r in registros:
-            fecha_str = r.get("fecha")
-            # Intentar varios nombres de campo posibles
-            valor = (
-                r.get("indice_ipc")
-                or r.get("valor")
-                or r.get("porcentaje")
-                or r.get("variacion")
-            )
-            if not fecha_str or valor is None:
+            valor = _extraer_valor(r)
+            fecha = _extraer_fecha(r)
+
+            if valor is None or fecha is None:
+                saltados += 1
                 continue
-            # Formato esperado igual al ICL: "dd/mm/yyyy"
-            try:
-                fecha = datetime.strptime(fecha_str, "%d/%m/%Y")
-            except ValueError:
-                try:
-                    fecha = datetime.strptime(fecha_str[:10], "%Y-%m-%d")
-                except ValueError:
-                    continue
-            ultimo_por_mes[(fecha.year, fecha.month)] = float(valor)
+
+            anio, mes = fecha
+            ultimo_por_mes[(anio, mes)] = valor
+
+        self.stdout.write(f"Registros parseados: {len(ultimo_por_mes)} | Saltados: {saltados}")
+
+        if not ultimo_por_mes:
+            self.stderr.write(self.style.ERROR(
+                "Ningún registro pudo parsearse. "
+                "Revisá los campos del primer registro impreso arriba."
+            ))
+            return
 
         creados = actualizados = omitidos = 0
         for (anio, mes), porcentaje in sorted(ultimo_por_mes.items()):
@@ -74,6 +117,6 @@ class Command(BaseCommand):
         ultimos = IndiceIPC.objects.order_by('-anio', '-mes')[:5]
         self.stdout.write("Últimos 5 registros:")
         for r in ultimos:
-            self.stdout.write(f"  {r.anio}/{r.mes:02d} — porcentaje: {r.porcentaje}%")
+            self.stdout.write(f"  {r.anio}/{r.mes:02d} — {r.porcentaje}%")
 
         self.stdout.write(self.style.SUCCESS("Migración completada."))
